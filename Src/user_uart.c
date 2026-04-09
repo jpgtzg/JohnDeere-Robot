@@ -15,8 +15,8 @@ void USER_USART1_Init( void ){
 	USART1->CR1		|= 	 USART_CR1_RE;//		Step 6 Receiver enabled
 
 	// Configuring RX pin (PA10) as input floating -> CNF=01, MODE=00
-	GPIOA->CRH		&=	~( 0xFUL << 8U );//		clear MODE10[1:0] and CNF10[1:0]
-	GPIOA->CRH		|=	 ( 0x1UL << 10U );//	CNF10=01 (floating input), MODE10=00
+	GPIOA->CRH		&=	~( 0xFUL << 8U );//		set 0 on the ones we want a 0
+	GPIOA->CRH		|=	 ( 0x1UL << 10U );//	set a 1 on the ones we want a 1
 }
 
 void USER_USART1_Transmit( uint8_t *pData, uint16_t size ){
