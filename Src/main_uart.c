@@ -17,8 +17,6 @@
 #include "main.h"
 #include "user_uart.h"
 
-uint8_t msg[] = "Hello World!\r\n";
-
 void USER_SystemClock_Config( void );
 void USER_GPIO_Init( void );
 /* Superloop structure */
@@ -30,9 +28,12 @@ int main(void)
 	USER_USART1_Init( );
     	/* Repetitive block */
     	for(;;){
-			GPIOA->ODR	^=	( 0x1UL <<  5U );//		value to toggle pin 5 of Port A (Toggle LD2)
-			printf("Hello STM32 World from Equipo 6\r\n");
-			GPIOA->ODR	^=	( 0x1UL <<  5U ); //		value to toggle pin 5 of Port A (Toggle LD2)
+			printf("Presiona la tecla 't' para intercambiar el estado del LED...\r\n");
+			uint8_t received = USER_USART1_Receive_8bit();
+			printf("Has presionado la tecla: %c\r\n", received);
+			if( received == 't' ){
+				GPIOA->ODR ^= ( 0x1UL << 5U );//	toggle LD2 (PA5)
+			}
     	}
 }
 
