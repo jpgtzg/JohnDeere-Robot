@@ -42,7 +42,7 @@ set(cpu_PARAMS
 
 # Sources
 set(sources_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/main_uart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/main_timer_part2.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_uart.c
 )
 
