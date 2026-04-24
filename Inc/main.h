@@ -75,6 +75,8 @@ typedef struct{
 	volatile uint32_t CNT;
 	volatile uint32_t PSC;
 	volatile uint32_t ARR;
+	volatile uint32_t RCR; // Reserved
+	volatile uint32_t CCR1;
 } TIM_TypeDef;
 
 typedef struct{
@@ -119,5 +121,6 @@ typedef struct{
 void USER_GPIO_Init( void );
 void USER_Delay_10ms( void );
 void USER_Delay_1sec( void );
+void USER_TIM2_Init( void );
 
 #endif /* MAIN_H_ */
