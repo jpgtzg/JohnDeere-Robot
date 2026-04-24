@@ -118,9 +118,9 @@ typedef struct{
 #define TIM3        (( TIM_TypeDef *)TIM3_BASE )
 #define NVIC        (( NVIC_TypeDef *)NVIC_BASE )
 
+void USER_SystemClock_Config( void );
 void USER_GPIO_Init( void );
 void USER_Delay_10ms( void );
 void USER_Delay_1sec( void );
 void USER_TIM2_Init( void );
-
 #endif /* MAIN_H_ */
