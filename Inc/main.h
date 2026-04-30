@@ -123,4 +123,5 @@ void USER_GPIO_Init( void );
 void USER_Delay_10ms( void );
 void USER_Delay_1sec( void );
 void USER_TIM2_Init( void );
+
 #endif /* MAIN_H_ */

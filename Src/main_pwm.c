@@ -1,14 +1,49 @@
+#include <stdint.h> // 							standard integer library
 #include "main.h"
+#include "user_keypad.h"
+#include <stdio.h>
+
+void CHANGE_DUTY_CYCLE(uint8_t duty);
 
 int main(void){
     USER_SystemClock_Config();
     USER_GPIO_Init();
     USER_TIM2_Init( );
-    
+    USER_Keypad_Init(); //						initialize the keypad GPIO pins
+
+	// Map keypad keys to their corresponding digit values (or -1 for non-digit keys) to use
+	// the according numbers to the value, instead of using the A-D column and other keys
+    static const int8_t key_to_digit[16] = {
+        1, 2, 3, -1,   // row 0: 1, 2, 3, A
+        4, 5, 6,  -1,   // row 1: 4, 5, 6, B
+        7, 8, 9, -1,   // row 2: 7, 8, 9, C
+       10, 0,-1, -1    // row 3: *, 0, E, D
+    };
+
     /* Repetitive block */
     for(;;){
-    
+    	uint8_t key = USER_Key();
+		if(key != 0xFF){
+			USER_Delay_10ms();
+			key = USER_Key();
+			if(key != 0xFF && key < 16){
+				int8_t digit = key_to_digit[key];
+				if(digit >= 0){
+					CHANGE_DUTY_CYCLE((uint8_t)digit * 10);
+				}
+			}
+		}
     }
+}
+
+void CHANGE_DUTY_CYCLE(uint8_t duty){
+	TIM2->CR1 &~  ( 0x1UL << 0U );//       stop the timer
+	
+	if(duty > 100) duty = 100; // Cap duty cycle at 100%
+	
+	TIM2->CCR1 = (TIM2->ARR + 1) * duty / 100; // Update CCR1 based on desired duty cycle
+	
+	TIM2->CR1 |=  ( 0x1UL << 0U );//       start the timer	
 }
 
 void USER_GPIO_Init( void ){
@@ -61,4 +96,13 @@ void USER_SystemClock_Config( void ){
 	RCC->CFGR	&=	~( 0x1UL << 0U  );//		PLL used as system clock (SW bits)
 	RCC->CFGR	|=	 ( 0x2UL << 0U  );//		PLL used as system clock (SW bits)
 	while( 0x8UL != ( RCC->CFGR & 0xCUL ));//	wait until PLL is switched
+}
+
+
+void USER_Delay_10ms( void ){
+	__asm(" 		ldr r0, =1249999	");//	load the value to be used as delay count
+	__asm(" again:	sub r0, r0, #1		");//	decrement the delay count
+	__asm("			cmp r0, #0			");//	check if the delay count has reached zero
+	__asm("			bne again			");//	if not, repeat the process
+	__asm("			nop					");//	no operation (to ensure exact timing)
 }

@@ -43,6 +43,9 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/main_pwm.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_keypad.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_uart.c
+
 )
 
 # Include directories for all compilers
