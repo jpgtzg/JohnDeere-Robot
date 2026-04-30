@@ -5,34 +5,13 @@
 
 void CHANGE_DUTY_CYCLE(uint8_t duty);
 
-int main(void){
+int main( void ){
     USER_SystemClock_Config();
     USER_GPIO_Init();
     USER_TIM2_Init( );
     USER_Keypad_Init(); //						initialize the keypad GPIO pins
-
-	// Map keypad keys to their corresponding digit values (or -1 for non-digit keys) to use
-	// the according numbers to the value, instead of using the A-D column and other keys
-    static const int8_t key_to_digit[16] = {
-        1, 2, 3, -1,   // row 0: 1, 2, 3, A
-        4, 5, 6,  -1,   // row 1: 4, 5, 6, B
-        7, 8, 9, -1,   // row 2: 7, 8, 9, C
-       10, 0,-1, -1    // row 3: *, 0, E, D
-    };
-
     /* Repetitive block */
     for(;;){
-    	uint8_t key = USER_Key();
-		if(key != 0xFF){
-			USER_Delay_10ms();
-			key = USER_Key();
-			if(key != 0xFF && key < 16){
-				int8_t digit = key_to_digit[key];
-				if(digit >= 0){
-					CHANGE_DUTY_CYCLE((uint8_t)digit * 10);
-				}
-			}
-		}
     }
 }
 
