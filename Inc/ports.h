@@ -104,15 +104,15 @@ typedef struct {
 #define TIM3_BASE   0x40000400UL //      TIM3 base address
 #define NVIC_BASE   0xE000E100UL
 
-#define AFIO ((AFIO_TypeDef *)AFIO_BASE)
-#define FLASH ((FLASH_TypeDef *)FLASH_BASE)
-#define RCC ((RCC_TypeDef *)RCC_BASE)
-#define GPIOA ((GPIO_TypeDef *)GPIOA_BASE)
-#define GPIOB ((GPIO_TypeDef *)GPIOB_BASE)
-#define GPIOC ((GPIO_TypeDef *)GPIOC_BASE)
-#define USART1 ((USART_TypeDef *)USART1_BASE)
-#define NVIC ((NVIC_TypeDef *)NVIC_BASE)
-#define TIM2 ((TIM_TypeDef *)TIM2_BASE)
-#define TIM3 ((TIM_TypeDef *)TIM3_BASE)
+#define AFIO    ((AFIO_TypeDef *)AFIO_BASE)
+#define FLASH   ((FLASH_TypeDef *)FLASH_BASE)
+#define RCC     ((RCC_TypeDef *)RCC_BASE)
+#define GPIOA   ((GPIO_TypeDef *)GPIOA_BASE)
+#define GPIOB   ((GPIO_TypeDef *)GPIOB_BASE)
+#define GPIOC   ((GPIO_TypeDef *)GPIOC_BASE)
+#define USART1  ((USART_TypeDef *)USART1_BASE)
+#define NVIC    ((NVIC_TypeDef *)NVIC_BASE)
+#define TIM2    ((TIM_TypeDef *)TIM2_BASE)
+#define TIM3    ((TIM_TypeDef *)TIM3_BASE)
 
 #endif
