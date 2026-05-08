@@ -1,8 +1,9 @@
 #ifndef FUNCTIONS_H_
 #define FUNCTIONS_H_
 
-/* Flash memory interface registers */
 #include <stdint.h>
+
+/* Flash memory interface registers */
 typedef struct {
   volatile uint32_t ACR;
   volatile uint32_t KEYR;
@@ -73,7 +74,6 @@ typedef struct {
   volatile uint32_t IP[84U];
   volatile uint32_t RESERVED5[683U];
   volatile uint32_t STIR;
-
 } NVIC_TypeDef;
 
 typedef struct {
@@ -93,16 +93,16 @@ typedef struct {
   volatile uint32_t CCR1;
 } TIM_TypeDef;
 
-#define FLASH_BASE 0x40022000UL //		FLASH base address
-#define RCC_BASE 0x40021000UL   //		RCC base address
-#define GPIOA_BASE 0x40010800UL //		GPIO Port A base address
-#define GPIOB_BASE 0x40010C00UL //		GPIO Port B base address
-#define GPIOC_BASE 0x40011000UL //		GPIO Port C base address
-#define AFIO_BASE 0x40010000UL
+#define FLASH_BASE  0x40022000UL //		FLASH base address
+#define RCC_BASE    0x40021000UL   //		RCC base address
+#define GPIOA_BASE  0x40010800UL //		GPIO Port A base address
+#define GPIOB_BASE  0x40010C00UL //		GPIO Port B base address
+#define GPIOC_BASE  0x40011000UL //		GPIO Port C base address
+#define AFIO_BASE   0x40010000UL
 #define USART1_BASE 0x40013800UL
-#define TIM2_BASE 0x40000000UL //      TIM2 base address
-#define TIM3_BASE 0x40000400UL //      TIM3 base address
-#define NVIC_BASE 0xE000E100UL
+#define TIM2_BASE   0x40000000UL //      TIM2 base address
+#define TIM3_BASE   0x40000400UL //      TIM3 base address
+#define NVIC_BASE   0xE000E100UL
 
 #define AFIO ((AFIO_TypeDef *)AFIO_BASE)
 #define FLASH ((FLASH_TypeDef *)FLASH_BASE)
