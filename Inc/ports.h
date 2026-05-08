@@ -1,5 +1,5 @@
-#ifndef FUNCTIONS_H_
-#define FUNCTIONS_H_
+#ifndef PORTS_H_
+#define PORTS_H_
 
 #include <stdint.h>
 
