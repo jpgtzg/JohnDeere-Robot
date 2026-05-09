@@ -76,3 +76,15 @@ void Delay_1sec_CPU(void) {
                                                                     // exact
                                                                     // timing)
 }
+
+
+void STM32_Button_Init(void) {
+    // Enable GPIOC clock
+    RCC->APB2ENR |= (0x1UL << 4U);      // GPIOC clock enable
+
+    // PC13 as input with pull-up (CNF=10, MODE=00)
+    // CRH controls pins 8–15; PC13 is at bits [23:20]
+    GPIOC->CRH &= ~(0xFUL << 20U);      // clear CNF13 and MODE13
+    GPIOC->CRH |=  (0x8UL << 20U);      // CNF13=10 (input pull-up/down), MODE13=00 (input)
+    GPIOC->ODR |=  (0x1UL << 13U);      // pull-up enabled via ODR
+}
