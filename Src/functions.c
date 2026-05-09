@@ -24,19 +24,12 @@ void SystemClock_Config(void) {
     ; //	wait until PLL is switched
 }
 
-void USER_GPIO_Init(void) {
+void GPIO_Init(void) {
   // Enable clock for GPIOA
   RCC->APB2ENR |= (0x1UL << 2U);
-
-  // Configure PA4-PA7 as output push-pull
-  for (int i = 4; i < 8; i++) {
-    GPIOA->CRL &= ~(0x3UL << (2U + (i * 4U))) &
-                  ~(0x2UL << (i * 4U)); // Clear CNF0[1:0] and MODE0_1 for PAi
-    GPIOA->CRL |= (0x1UL << (i * 4U));  // Set MODE0_1 for PAi
-  }
 }
 
-void USER_Delay_10ms_CPU(void) {
+void Delay_10ms_CPU(void) {
   __asm(" 		ldr r0, =1249999	"); //	load the value to be
                                                     // used as delay count
   __asm(" again:	sub r0, r0, #1		"); //	decrement the delay
@@ -60,7 +53,7 @@ void USER_Delay_10ms_CPU(void) {
                                                                     // timing)
 }
 
-void USER_Delay_1sec_CPU(void) {
+void Delay_1sec_CPU(void) {
   __asm(" 		ldr r0, =7111111	"); //	load the value to be
                                                     // used as delay count
   __asm(" again1:	sub r0, r0, #1		"); //	decrement the delay
