@@ -11,7 +11,7 @@
 #define USART_SR_RXNE (0x1UL << 5U)
 #define USART_CR1_RE (0x1UL << 2U)
 
-void USART1_INIT( void );
+void USART1_Init( void );
 void USART1_Transmit(uint8_t *pData, uint16_t size);
 uint8_t USART1_Receive_8bit( void );
 void USART1_Send_8bit( uint8_t Data );
