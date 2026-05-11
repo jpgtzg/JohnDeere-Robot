@@ -11,8 +11,8 @@
 # If no LICENSE file comes with this software, it is provided AS-IS.
 #
 # -----------------------------------------------------------------------------
- 
- cmake_minimum_required(VERSION 3.20)
+
+cmake_minimum_required(VERSION 3.20)
 
 #
 # This file is generated only once, and is not re-generated.
@@ -34,7 +34,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
 # Core MCU flags, CPU type, instruction set and FPU setup
-set(cpu_PARAMS 
+set(cpu_PARAMS
     # Other parameters
     # -mthumb
     # -mcpu, -mfloat, -mfloat-abi, ...
@@ -42,15 +42,14 @@ set(cpu_PARAMS
 
 # Sources
 set(sources_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/main_pwm.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_keypad.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/user_uart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/functions.c
 
 )
 
 # Include directories for all compilers
 set(include_DIRS
-	${CMAKE_CURRENT_SOURCE_DIR}/Inc
+ ${CMAKE_CURRENT_SOURCE_DIR}/Inc
 )
 
 # Include directories for each compiler
