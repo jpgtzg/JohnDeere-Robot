@@ -23,11 +23,11 @@
 #include "main.h"
 #include "functions.h"
 #include "ports.h"
-#include <stdint.h>
 
 int main(void) {
 
-  GPIO_Init();
+  ADC1_GPIO_Init();
+  ADC1_Init();
 
   for (;;) {
   }

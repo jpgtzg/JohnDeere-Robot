@@ -2,6 +2,7 @@
 #define PORTS_H_
 
 #include <stdint.h>
+#include <sys/types.h>
 
 /* Flash memory interface registers */
 typedef struct {
@@ -93,26 +94,51 @@ typedef struct {
   volatile uint32_t CCR1;
 } TIM_TypeDef;
 
-#define FLASH_BASE  0x40022000UL //		FLASH base address
-#define RCC_BASE    0x40021000UL   //		RCC base address
-#define GPIOA_BASE  0x40010800UL //		GPIO Port A base address
-#define GPIOB_BASE  0x40010C00UL //		GPIO Port B base address
-#define GPIOC_BASE  0x40011000UL //		GPIO Port C base address
-#define AFIO_BASE   0x40010000UL
-#define USART1_BASE 0x40013800UL
-#define TIM2_BASE   0x40000000UL //      TIM2 base address
-#define TIM3_BASE   0x40000400UL //      TIM3 base address
-#define NVIC_BASE   0xE000E100UL
+typedef struct {
+  volatile uint32_t SR;
+  volatile uint32_t CR1;
+  volatile uint32_t CR2;
+  volatile uint32_t SMPR1;
+  volatile uint32_t SMPR2;
+  volatile uint32_t JOFR1;
+  volatile uint32_t JOFR2;
+  volatile uint32_t JOFR3;
+  volatile uint32_t JOFR4;
+  volatile uint32_t HTR;
+  volatile uint32_t LTR;
+  volatile uint32_t SQR1;
+  volatile uint32_t SQR2;
+  volatile uint32_t SQR3;
+  volatile uint32_t JSQR;
+  volatile uint32_t JDR1;
+  volatile uint32_t JDR2;
+  volatile uint32_t JDR3;
+  volatile uint32_t JDR4;
+  volatile uint32_t DR;
+} ADC_TypeDef;
 
-#define AFIO    ((AFIO_TypeDef *)AFIO_BASE)
-#define FLASH   ((FLASH_TypeDef *)FLASH_BASE)
-#define RCC     ((RCC_TypeDef *)RCC_BASE)
-#define GPIOA   ((GPIO_TypeDef *)GPIOA_BASE)
-#define GPIOB   ((GPIO_TypeDef *)GPIOB_BASE)
-#define GPIOC   ((GPIO_TypeDef *)GPIOC_BASE)
-#define USART1  ((USART_TypeDef *)USART1_BASE)
-#define NVIC    ((NVIC_TypeDef *)NVIC_BASE)
-#define TIM2    ((TIM_TypeDef *)TIM2_BASE)
-#define TIM3    ((TIM_TypeDef *)TIM3_BASE)
+#define FLASH_BASE 0x40022000UL //		FLASH base address
+#define RCC_BASE 0x40021000UL   //		RCC base address
+#define GPIOA_BASE 0x40010800UL //		GPIO Port A base address
+#define GPIOB_BASE 0x40010C00UL //		GPIO Port B base address
+#define GPIOC_BASE 0x40011000UL //		GPIO Port C base address
+#define AFIO_BASE 0x40010000UL
+#define USART1_BASE 0x40013800UL
+#define TIM2_BASE 0x40000000UL //      TIM2 base address
+#define TIM3_BASE 0x40000400UL //      TIM3 base address
+#define NVIC_BASE 0xE000E100UL
+#define ADC1_BASE 0x40012400UL
+
+#define AFIO ((AFIO_TypeDef *)AFIO_BASE)
+#define FLASH ((FLASH_TypeDef *)FLASH_BASE)
+#define RCC ((RCC_TypeDef *)RCC_BASE)
+#define GPIOA ((GPIO_TypeDef *)GPIOA_BASE)
+#define GPIOB ((GPIO_TypeDef *)GPIOB_BASE)
+#define GPIOC ((GPIO_TypeDef *)GPIOC_BASE)
+#define USART1 ((USART_TypeDef *)USART1_BASE)
+#define NVIC ((NVIC_TypeDef *)NVIC_BASE)
+#define TIM2 ((TIM_TypeDef *)TIM2_BASE)
+#define TIM3 ((TIM_TypeDef *)TIM3_BASE)
+#define ADC1 ((ADC_TypeDef *)ADC1_BASE)
 
 #endif
