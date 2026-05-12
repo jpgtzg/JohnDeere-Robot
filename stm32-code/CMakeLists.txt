@@ -44,6 +44,11 @@ set(cpu_PARAMS
 set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/functions.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/EngTrModel.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/EngTrModel_data.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/rtGetInf.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/rtGetNaN.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/rt_nonfinite.c
 
 )
 
@@ -114,7 +119,8 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # Add linked libraries
-target_link_libraries(${CMAKE_PROJECT_NAME} ${link_LIBS})
+target_link_libraries(${CMAKE_PROJECT_NAME} ${link_LIBS}
+    -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group)
 
 # Compiler options
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
@@ -147,12 +153,6 @@ target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
     -Wl,-Map=${CMAKE_PROJECT_NAME}.map
     -u _printf_float # STDIO float formatting support (remove if not used)
     --specs=nosys.specs
-    -Wl,--start-group
-    -lc
-    -lm
-    -lstdc++
-    -lsupc++
-    -Wl,--end-group
     -Wl,-z,max-page-size=8 # Allow good software remapping across address space (with proper GCC section making)
     -Wl,--print-memory-usage
 )
