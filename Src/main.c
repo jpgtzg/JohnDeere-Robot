@@ -21,14 +21,28 @@
  * *********************************************** */
 /* Libraries, Definitions and Global Declarations */
 #include "main.h"
+#include "EngTrModel.h"
 #include "functions.h"
 #include "ports.h"
+#include <stdio.h>
 
 int main(void) {
 
   ADC1_GPIO_Init();
   ADC1_Init();
+  EngTrModel_initialize();
 
   for (;;) {
+    EngTrModel_U.Throttle = adc_value;
+    EngTrModel_U.BrakeTorque = 0;
+    EngTrModel_step();
+
+    double engine_speed = EngTrModel_Y.EngineSpeed;
+    double vehicle_speed = EngTrModel_Y.VehicleSpeed;
+    double gear = EngTrModel_Y.Gear;
+
+    printf("Vehicle Speed: %f\r\n", vehicle_speed);
+    printf("Engine Speed: %f\r\n", engine_speed);
+    printf("Gear: %f\r\n", gear);
   }
 }
