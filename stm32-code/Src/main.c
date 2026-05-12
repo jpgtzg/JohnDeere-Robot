@@ -24,22 +24,47 @@
 #include "EngTrModel.h"
 #include "functions.h"
 #include "ports.h"
+#include "lcd.h"
 #include <stdio.h>
 
 int main(void) {
 
   ADC1_GPIO_Init();
   ADC1_Init();
+  STM32_Button_Init(); 
+  
+  LCD_Init();
+
   EngTrModel_initialize();
 
+  LCD_Set_Cursor(1, 1);
+  LCD_Put_Str("Transmision Tractor");
+  LCD_Set_Cursor(2, 3);
+  
+  Delay_1sec_CPU();
+  Delay_1sec_CPU();
+  LCD_Clear();
+
   for (;;) {
-    EngTrModel_U.Throttle = adc_value;
-    EngTrModel_U.BrakeTorque = 0;
+    EngTrModel_U.Throttle = adc_value; 
+
+    uint8_t btn = (GPIOC->IDR & (0x1UL << 13U)) ? 0 : 1;
+    EngTrModel_U.BrakeTorque = btn ? 100.0 : 0.0;
+
     EngTrModel_step();
 
     double engine_speed = EngTrModel_Y.EngineSpeed;
     double vehicle_speed = EngTrModel_Y.VehicleSpeed;
     double gear = EngTrModel_Y.Gear;
+
+    char line[17];
+    snprintf(line, sizeof(line), "Ac:%4.0f   M:%u", (double)adc_value, (unsigned)gear);
+    LCD_Set_Cursor(1, 1);
+    LCD_Put_Str(line);
+
+    snprintf(line, sizeof(line), "RPM:%8.1f  ", engine_speed);
+    LCD_Set_Cursor(2, 1);
+    LCD_Put_Str(line);
 
     printf("Vehicle Speed: %f\r\n", vehicle_speed);
     printf("Engine Speed: %f\r\n", engine_speed);

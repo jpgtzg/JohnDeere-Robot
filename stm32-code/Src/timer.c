@@ -101,6 +101,16 @@ void TIM2_Delay_2s_Interrupt(void) {
   TIM2->CR1 |= (0x1UL << 0U);       // start timer
 }
 
+void TIM2_40ms_Interrupt_Init(void) {
+  TIM2->SR &= ~(0x1UL << 0U); 
+  TIM2->PSC = 6399;           // 64 MHz / 6400 = 10 kHz
+  TIM2->CNT = 0;
+  TIM2->ARR = 399;            // 10 kHz / 400 = 25 Hz = 40 ms
+  TIM2->DIER |= (0x1UL << 0U);      // enable UIE
+  NVIC->ISER[0U] |= (0x1UL << 28U);
+  TIM2->CR1 |= (0x1UL << 0U);       // start timer
+}
+
 void TIM3_Delay_10ms_Interrupt(void) {
   TIM3->SR &= ~(0x1UL << 0U); // clear overflow flag
   TIM3->PSC = 9;
