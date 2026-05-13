@@ -13,5 +13,6 @@ void TIM2_Delay_10ms_Interrupt(void);
 void TIM2_Delay_2s_Interrupt(void);
 void TIM3_Delay_10ms_Interrupt(void);
 void TIM3_Delay_2s_Interrupt(void);
+void TIM2_40ms_Interrupt(void);
 
 #endif

@@ -120,3 +120,15 @@ void TIM3_Delay_2s_Interrupt(void) {
   NVIC->ISER[0U] |= (0x1UL << 29U); // TIM3 global interrupt at position 29
   TIM3->CR1 |= (0x1UL << 0U);       // start timer
 }
+
+// TIM2 clock = 64MHz (2x APB1 since APB1 prescaler > 1)
+// PSC=63 -> 1MHz tick, ARR=39999 -> 40ms period
+void TIM2_40ms_Interrupt(void) {
+  TIM2->SR &= ~(0x1UL << 0U);       // clear overflow flag
+  TIM2->PSC = 63;
+  TIM2->CNT = 0;
+  TIM2->ARR = 39999;
+  TIM2->DIER |= (0x1UL << 0U);      // enable UIE
+  NVIC->ISER[0U] |= (0x1UL << 28U); // TIM2 global interrupt at position 28
+  TIM2->CR1 |= (0x1UL << 0U);       // start timer
+}

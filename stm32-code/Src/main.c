@@ -24,23 +24,41 @@
 #include "EngTrModel.h"
 #include "functions.h"
 #include "ports.h"
+#include "timer.h"
+#include "uart.h"
 #include <stdio.h>
 
-int main(void) {
+volatile double engine_speed = 0;
+volatile double vehicle_speed = 0;
+volatile double gear = 0;
+volatile uint8_t isr_overrun = 0;
 
-  ADC1_GPIO_Init();
-  ADC1_Init();
-  EngTrModel_initialize();
+void TIM2_IRQHandler(void) {
+  if (TIM2->SR & (0x1UL << 0U)) {
+    TIM2->SR &= ~(0x1UL << 0U);
 
-  for (;;) {
-    EngTrModel_U.Throttle = adc_value;
+    float adc_percent = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+    EngTrModel_U.Throttle = adc_percent;
     EngTrModel_U.BrakeTorque = 0;
     EngTrModel_step();
 
-    double engine_speed = EngTrModel_Y.EngineSpeed;
-    double vehicle_speed = EngTrModel_Y.VehicleSpeed;
-    double gear = EngTrModel_Y.Gear;
+    engine_speed = EngTrModel_Y.EngineSpeed;
+    vehicle_speed = EngTrModel_Y.VehicleSpeed;
+    gear = EngTrModel_Y.Gear;
+  }
+}
 
+int main(void) {
+
+  SystemClock_Config();
+  USART2_Init();
+  ADC1_GPIO_Init();
+  ADC1_Init();
+  TIM2_Init();
+  TIM2_40ms_Interrupt();
+  EngTrModel_initialize();
+
+  for (;;) {
     printf("Vehicle Speed: %f\r\n", vehicle_speed);
     printf("Engine Speed: %f\r\n", engine_speed);
     printf("Gear: %f\r\n", gear);
