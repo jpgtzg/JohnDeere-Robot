@@ -116,7 +116,7 @@ void ADC1_Init(void) {
   ADC1->CR2 |= (0x1UL << 0U); // start conversions
 }
 
-void ADC_IRQ_Handler(void) {
+void ADC1_2_IRQHandler(void) {
   if (ADC1->SR & (0x1UL << 1U)) {
     adc_value = ADC1->DR & 0xFFFF;
     ADC1->SR &= ~(0x1UL << 1U);

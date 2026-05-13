@@ -13,6 +13,6 @@ void Delay_1sec_CPU(void);
 void STM32_Button_Init(void);
 void ADC1_GPIO_Init(void);
 void ADC1_Init(void);
-void ADC_IRQ_Handler(void);
+void ADC1_2_IRQHandler(void);
 
 #endif
