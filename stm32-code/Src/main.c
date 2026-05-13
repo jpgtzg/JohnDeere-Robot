@@ -28,23 +28,15 @@
 #include "uart.h"
 #include <stdio.h>
 
-volatile double engine_speed = 0;
-volatile double vehicle_speed = 0;
-volatile double gear = 0;
-volatile uint8_t isr_overrun = 0;
+volatile double brake_torque = 0;
 
 void TIM2_IRQHandler(void) {
   if (TIM2->SR & (0x1UL << 0U)) {
     TIM2->SR &= ~(0x1UL << 0U);
 
-    float adc_percent = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
-    EngTrModel_U.Throttle = adc_percent;
-    EngTrModel_U.BrakeTorque = 0;
+    EngTrModel_U.Throttle = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+    EngTrModel_U.BrakeTorque = brake_torque;
     EngTrModel_step();
-
-    engine_speed = EngTrModel_Y.EngineSpeed;
-    vehicle_speed = EngTrModel_Y.VehicleSpeed;
-    gear = EngTrModel_Y.Gear;
   }
 }
 
@@ -55,12 +47,22 @@ int main(void) {
   ADC1_GPIO_Init();
   ADC1_Init();
   TIM2_Init();
-  TIM2_40ms_Interrupt();
+  TIM2_40ms_Interrupt_Config();
+  EXT_Button_Init();
   EngTrModel_initialize();
 
   for (;;) {
-    printf("Vehicle Speed: %f\r\n", vehicle_speed);
-    printf("Engine Speed: %f\r\n", engine_speed);
-    printf("Gear: %f\r\n", gear);
+    if (!EXT_BUTTON) {
+      Delay_10ms_CPU();
+      if (!EXT_BUTTON) {
+        printf("Button pressed!...\r\n");
+        brake_torque = 100.0;
+      }
+    } else {
+      brake_torque = 0;
+    }
+    printf("Vehicle Speed: %f\r\n", EngTrModel_Y.VehicleSpeed);
+    printf("Engine Speed: %f\r\n", EngTrModel_Y.EngineSpeed);
+    printf("Gear: %f\r\n", EngTrModel_Y.Gear);
   }
 }
