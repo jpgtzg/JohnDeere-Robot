@@ -135,6 +135,7 @@ typedef struct {
 #define TIM3_BASE 0x40000400UL //      TIM3 base address
 #define NVIC_BASE 0xE000E100UL
 #define ADC1_BASE 0x40012400UL
+#define TIM1_BASE 0x40012C00UL
 
 #define AFIO ((AFIO_TypeDef *)AFIO_BASE)
 #define FLASH ((FLASH_TypeDef *)FLASH_BASE)
@@ -147,6 +148,7 @@ typedef struct {
 #define NVIC ((NVIC_TypeDef *)NVIC_BASE)
 #define TIM2 ((TIM_TypeDef *)TIM2_BASE)
 #define TIM3 ((TIM_TypeDef *)TIM3_BASE)
+#define TIM1 ((TIM_TypeDef *)TIM1_BASE)
 #define ADC1 ((ADC_TypeDef *)ADC1_BASE)
 
 #endif

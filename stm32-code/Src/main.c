@@ -24,6 +24,7 @@
 #include "EngTrModel.h"
 #include "functions.h"
 #include "ports.h"
+#include "lcd.h"
 #include "pwm.h"
 #include "timer.h"
 #include "uart.h"
@@ -55,8 +56,18 @@ int main(void) {
   EXT_Button_Init();
   PWM_GPIO_Init();
   TIM2_PWM_Init();
+   
+  LCD_Init();
+  LCD_Set_Cursor(1, 1);
+  LCD_Put_Str("Transmision Tractor");
+  LCD_Set_Cursor(2, 3);
+  Delay_1sec_CPU();
+  Delay_1sec_CPU();
+  LCD_Clear();
+  
   EngTrModel_initialize();
-
+    
+  
   float max_vehicle_speed = 0.0;
 
   for (;;) {
@@ -70,10 +81,26 @@ int main(void) {
       brake_torque = 0;
     }
 
+
     printf("ADC Percent: % f\r\n", adc_value_percent);
+
+
+    char line[17];
+    snprintf(line, sizeof(line), "Ac:%4.0f   M:%u", (double)adc_value, (unsigned)gear);
+    LCD_Set_Cursor(1, 1);
+    LCD_Put_Str(line);
+
+    snprintf(line, sizeof(line), "RPM:%8.1f  ", engine_speed);
+    LCD_Set_Cursor(2, 1);
+    LCD_Put_Str(line);
+
+    printf("Vehicle Speed: %f\r\n", vehicle_speed);
+    printf("Engine Speed: %f\r\n", engine_speed);
+    printf("Gear: %f\r\n", gear);
 
     // printf("Vehicle Speed: %f\r\n", EngTrModel_Y.VehicleSpeed);
     // printf("Engine Speed: %f\r\n", EngTrModel_Y.EngineSpeed);
     // printf("Gear: %f\r\n", EngTrModel_Y.Gear);
+
   }
 }
