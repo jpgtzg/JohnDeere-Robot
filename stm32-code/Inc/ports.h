@@ -90,8 +90,14 @@ typedef struct {
   volatile uint32_t CNT;
   volatile uint32_t PSC;
   volatile uint32_t ARR;
-  volatile uint32_t RCR; // Reserved
+  volatile uint32_t RCR1; // Reserved
   volatile uint32_t CCR1;
+  volatile uint32_t CCR2;
+  volatile uint32_t CCR3;
+  volatile uint32_t CCR4;
+  volatile uint32_t RCR2; // Reserved
+  volatile uint32_t DCR;
+  volatile uint32_t DMAR;
 } TIM_TypeDef;
 
 typedef struct {
