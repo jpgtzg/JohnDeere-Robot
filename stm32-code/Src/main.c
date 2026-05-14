@@ -24,19 +24,23 @@
 #include "EngTrModel.h"
 #include "functions.h"
 #include "ports.h"
+#include "pwm.h"
 #include "timer.h"
 #include "uart.h"
 #include <stdio.h>
 
 volatile double brake_torque = 0;
-
+volatile double adc_value_percent = 0;
 void TIM3_IRQHandler(void) {
   if (TIM3->SR & (0x1UL << 0U)) {
     TIM3->SR &= ~(0x1UL << 0U);
 
-    EngTrModel_U.Throttle = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+    adc_value_percent = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+    EngTrModel_U.Throttle = adc_value_percent;
     EngTrModel_U.BrakeTorque = brake_torque;
     EngTrModel_step();
+
+    Change_Duty_Cycle(adc_value_percent);
   }
 }
 
@@ -49,7 +53,11 @@ int main(void) {
   TIM3_Init();
   TIM3_40ms_Interrupt_Config();
   EXT_Button_Init();
+  PWM_GPIO_Init();
+  TIM2_PWM_Init();
   EngTrModel_initialize();
+
+  float max_vehicle_speed = 0.0;
 
   for (;;) {
     if (EXT_BUTTON) {
@@ -62,8 +70,10 @@ int main(void) {
       brake_torque = 0;
     }
 
-    printf("Vehicle Speed: %f\r\n", EngTrModel_Y.VehicleSpeed);
-    printf("Engine Speed: %f\r\n", EngTrModel_Y.EngineSpeed);
-    printf("Gear: %f\r\n", EngTrModel_Y.Gear);
+    printf("ADC Percent: % f\r\n", adc_value_percent);
+
+    // printf("Vehicle Speed: %f\r\n", EngTrModel_Y.VehicleSpeed);
+    // printf("Engine Speed: %f\r\n", EngTrModel_Y.EngineSpeed);
+    // printf("Gear: %f\r\n", EngTrModel_Y.Gear);
   }
 }

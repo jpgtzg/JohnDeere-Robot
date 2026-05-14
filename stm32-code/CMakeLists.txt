@@ -46,6 +46,7 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/uart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/timer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/pwm.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/EngTrModel.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/EngTrModel_data.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/rtGetInf.c
