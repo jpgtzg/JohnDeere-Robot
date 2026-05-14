@@ -30,9 +30,9 @@
 
 volatile double brake_torque = 0;
 
-void TIM2_IRQHandler(void) {
-  if (TIM2->SR & (0x1UL << 0U)) {
-    TIM2->SR &= ~(0x1UL << 0U);
+void TIM3_IRQHandler(void) {
+  if (TIM3->SR & (0x1UL << 0U)) {
+    TIM3->SR &= ~(0x1UL << 0U);
 
     EngTrModel_U.Throttle = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
     EngTrModel_U.BrakeTorque = brake_torque;
@@ -46,21 +46,22 @@ int main(void) {
   USART2_Init();
   ADC1_GPIO_Init();
   ADC1_Init();
-  TIM2_Init();
-  TIM2_40ms_Interrupt_Config();
+  TIM3_Init();
+  TIM3_40ms_Interrupt_Config();
   EXT_Button_Init();
   EngTrModel_initialize();
 
   for (;;) {
-    if (!EXT_BUTTON) {
+    if (EXT_BUTTON) {
       Delay_10ms_CPU();
-      if (!EXT_BUTTON) {
+      if (EXT_BUTTON) {
         printf("Button pressed!...\r\n");
         brake_torque = 100.0;
       }
     } else {
       brake_torque = 0;
     }
+
     printf("Vehicle Speed: %f\r\n", EngTrModel_Y.VehicleSpeed);
     printf("Engine Speed: %f\r\n", EngTrModel_Y.EngineSpeed);
     printf("Gear: %f\r\n", EngTrModel_Y.Gear);

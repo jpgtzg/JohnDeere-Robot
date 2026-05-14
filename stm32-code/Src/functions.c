@@ -94,7 +94,7 @@ void EXT_Button_Init(void) {
   // CRH controls pins 8–15; PC0 is at bits [3:0]
   GPIOC->CRH &= ~(0xFUL << 0U); // clear CNF0 and MODE0
   GPIOC->CRH |= (0x8UL << 0U); // CNF0=10 (input pull-up/down), MODE0=00 (input)
-  GPIOC->ODR |= (0x1UL << 0U); // pull-up enabled via ODR
+  GPIOC->ODR |= (0x1UL << 1U); // pull-do}wn enabled via ODR
 }
 
 // This code uses PA0 as the ADC input channel.
