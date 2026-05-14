@@ -86,6 +86,17 @@ void STM32_Button_Init(void) {
   GPIOC->ODR |= (0x1UL << 13U); // pull-up enabled via ODR
 }
 
+void EXT_Button_Init(void) {
+  // Enable GPIOC clock
+  RCC->APB2ENR |= (0x1UL << 4U); // GPIOC clock enable
+
+  // PC0 as input with pull-down (CNF=10, MODE=00)
+  // CRH controls pins 8–15; PC0 is at bits [3:0]
+  GPIOC->CRH &= ~(0xFUL << 0U); // clear CNF0 and MODE0
+  GPIOC->CRH |= (0x8UL << 0U); // CNF0=10 (input pull-up/down), MODE0=00 (input)
+  GPIOC->ODR |= (0x1UL << 1U); // pull-do}wn enabled via ODR
+}
+
 // This code uses PA0 as the ADC input channel.
 void ADC1_GPIO_Init(void) {
   RCC->APB2ENR |= (0x1UL << 2U); // enable GPIOA clock
@@ -116,7 +127,7 @@ void ADC1_Init(void) {
   ADC1->CR2 |= (0x1UL << 0U); // start conversions
 }
 
-void ADC_IRQ_Handler(void) {
+void ADC1_2_IRQHandler(void) {
   if (ADC1->SR & (0x1UL << 1U)) {
     adc_value = ADC1->DR & 0xFFFF;
     ADC1->SR &= ~(0x1UL << 1U);

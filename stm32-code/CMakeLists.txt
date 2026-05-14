@@ -44,6 +44,9 @@ set(cpu_PARAMS
 set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/functions.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/uart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/timer.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/pwm.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/EngTrModel.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/EngTrModel_data.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/rtGetInf.c
@@ -72,7 +75,7 @@ set(symbols_asm_SYMB)
 
 # Link directories and names of libraries
 set(link_DIRS)
-set(link_LIBS)
+set(link_LIBS m)
 
 # Linker script
 set(linker_script_SRC)
@@ -119,8 +122,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # Add linked libraries
-target_link_libraries(${CMAKE_PROJECT_NAME} ${link_LIBS}
-    -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group)
+target_link_libraries(${CMAKE_PROJECT_NAME} ${link_LIBS})
 
 # Compiler options
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE

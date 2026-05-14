@@ -90,8 +90,14 @@ typedef struct {
   volatile uint32_t CNT;
   volatile uint32_t PSC;
   volatile uint32_t ARR;
-  volatile uint32_t RCR; // Reserved
+  volatile uint32_t RCR1; // Reserved
   volatile uint32_t CCR1;
+  volatile uint32_t CCR2;
+  volatile uint32_t CCR3;
+  volatile uint32_t CCR4;
+  volatile uint32_t RCR2; // Reserved
+  volatile uint32_t DCR;
+  volatile uint32_t DMAR;
 } TIM_TypeDef;
 
 typedef struct {
@@ -124,6 +130,7 @@ typedef struct {
 #define GPIOC_BASE 0x40011000UL //		GPIO Port C base address
 #define AFIO_BASE 0x40010000UL
 #define USART1_BASE 0x40013800UL
+#define USART2_BASE 0x40004400UL
 #define TIM2_BASE 0x40000000UL //      TIM2 base address
 #define TIM3_BASE 0x40000400UL //      TIM3 base address
 #define NVIC_BASE 0xE000E100UL
@@ -137,6 +144,7 @@ typedef struct {
 #define GPIOB ((GPIO_TypeDef *)GPIOB_BASE)
 #define GPIOC ((GPIO_TypeDef *)GPIOC_BASE)
 #define USART1 ((USART_TypeDef *)USART1_BASE)
+#define USART2 ((USART_TypeDef *)USART2_BASE)
 #define NVIC ((NVIC_TypeDef *)NVIC_BASE)
 #define TIM2 ((TIM_TypeDef *)TIM2_BASE)
 #define TIM3 ((TIM_TypeDef *)TIM3_BASE)

@@ -1,8 +1,12 @@
 #ifndef UART_H_
 #define UART_H_
 
-//	115200 baud rate at 64 MHz
+#include <stdint.h>
+
+//	115200 baud rate at 64 MHz (APB2)
 #define USARTDIV 0x22C
+//	115200 baud rate at 32 MHz (APB1)
+#define USARTDIV2 0x116
 #define USART_CR1_UE (0x1UL << 13U)
 #define USART_CR1_M (0x1UL << 12U)
 #define USART_CR1_TE (0x1UL << 3U)
@@ -15,6 +19,11 @@ void USART1_Init( void );
 void USART1_Transmit(uint8_t *pData, uint16_t size);
 uint8_t USART1_Receive_8bit( void );
 void USART1_Send_8bit( uint8_t Data );
+
+void USART2_Init( void );
+void USART2_Transmit(uint8_t *pData, uint16_t size);
+uint8_t USART2_Receive_8bit( void );
+void USART2_Send_8bit( uint8_t Data );
 int _write(int file, char *ptr, int len);
 
 #endif

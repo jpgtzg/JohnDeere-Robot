@@ -25,37 +25,65 @@
 #include "functions.h"
 #include "ports.h"
 #include "lcd.h"
+#include "pwm.h"
+#include "timer.h"
+#include "uart.h"
 #include <stdio.h>
+
+volatile double brake_torque = 0;
+volatile double adc_value_percent = 0;
+void TIM3_IRQHandler(void) {
+  if (TIM3->SR & (0x1UL << 0U)) {
+    TIM3->SR &= ~(0x1UL << 0U);
+
+    adc_value_percent = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+    EngTrModel_U.Throttle = adc_value_percent;
+    EngTrModel_U.BrakeTorque = brake_torque;
+    EngTrModel_step();
+
+    Change_Duty_Cycle(adc_value_percent);
+  }
+}
 
 int main(void) {
 
+  SystemClock_Config();
+  USART2_Init();
   ADC1_GPIO_Init();
   ADC1_Init();
-  STM32_Button_Init(); 
-  
+  TIM3_Init();
+  TIM3_40ms_Interrupt_Config();
+  EXT_Button_Init();
+  PWM_GPIO_Init();
+  TIM2_PWM_Init();
+   
   LCD_Init();
-
-  EngTrModel_initialize();
-
   LCD_Set_Cursor(1, 1);
   LCD_Put_Str("Transmision Tractor");
   LCD_Set_Cursor(2, 3);
-  
   Delay_1sec_CPU();
   Delay_1sec_CPU();
   LCD_Clear();
+  
+  EngTrModel_initialize();
+    
+  
+  float max_vehicle_speed = 0.0;
 
   for (;;) {
-    EngTrModel_U.Throttle = adc_value; 
+    if (EXT_BUTTON) {
+      Delay_10ms_CPU();
+      if (EXT_BUTTON) {
+        printf("Button pressed!...\r\n");
+        brake_torque = 100.0;
+      }
+    } else {
+      brake_torque = 0;
+    }
 
-    uint8_t btn = (GPIOC->IDR & (0x1UL << 13U)) ? 0 : 1;
-    EngTrModel_U.BrakeTorque = btn ? 100.0 : 0.0;
 
-    EngTrModel_step();
+    printf("ADC Percent: % f\r\n", adc_value_percent);
 
-    double engine_speed = EngTrModel_Y.EngineSpeed;
-    double vehicle_speed = EngTrModel_Y.VehicleSpeed;
-    double gear = EngTrModel_Y.Gear;
 
     char line[17];
     snprintf(line, sizeof(line), "Ac:%4.0f   M:%u", (double)adc_value, (unsigned)gear);
@@ -69,5 +97,10 @@ int main(void) {
     printf("Vehicle Speed: %f\r\n", vehicle_speed);
     printf("Engine Speed: %f\r\n", engine_speed);
     printf("Gear: %f\r\n", gear);
+
+    // printf("Vehicle Speed: %f\r\n", EngTrModel_Y.VehicleSpeed);
+    // printf("Engine Speed: %f\r\n", EngTrModel_Y.EngineSpeed);
+    // printf("Gear: %f\r\n", EngTrModel_Y.Gear);
+
   }
 }

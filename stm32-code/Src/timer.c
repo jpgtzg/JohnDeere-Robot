@@ -18,11 +18,12 @@ void TIM2_Init(void) {
 
 void TIM3_Init(void) {
   RCC->APB1ENR |= (0x1UL << 1U); //       TIM3 clock enable
-  TIM3->SMCR &=
-      ~(0x7UL << 0U); //                                       select internal
-                      //                                       CLK source
-  TIM3->CR1 &=
-      ~(0x3UL << 5U) & ~(0x1UL << 4U) & ~(0x1UL << 1U); // mode edge-upcounter
+
+  // select internal CLK source
+  TIM3->SMCR &= ~(0x7UL << 0U);
+
+  // mode edge-upcounter
+  TIM3->CR1 &= ~(0x3UL << 5U) & ~(0x1UL << 4U) & ~(0x1UL << 1U);
 }
 
 // ===============================================================================
@@ -79,9 +80,10 @@ void TIM3_Delay_2s_Polling(void) {
 // (assumes TIM2_Init / TIM3_Init already called for clock and mode setup)
 // Remember to implement the corresponding interrupt handlers in your main file
 // to handle the timer interrupts and clear the overflow flags appropriately
+
 // ===============================================================================
 
-void TIM2_Delay_10ms_Interrupt(void) {
+void TIM2_Delay_10ms_Interrupt_Config(void) {
   TIM2->SR &= ~(0x1UL << 0U); // clear overflow flag
   TIM2->PSC = 9;
   TIM2->CNT = 1536;
@@ -91,7 +93,7 @@ void TIM2_Delay_10ms_Interrupt(void) {
   TIM2->CR1 |= (0x1UL << 0U);       // start timer
 }
 
-void TIM2_Delay_2s_Interrupt(void) {
+void TIM2_Delay_2s_Interrupt_Config(void) {
   TIM2->SR &= ~(0x1UL << 0U); // clear overflow flag
   TIM2->PSC = 1953;
   TIM2->CNT = 29;
@@ -101,17 +103,7 @@ void TIM2_Delay_2s_Interrupt(void) {
   TIM2->CR1 |= (0x1UL << 0U);       // start timer
 }
 
-void TIM2_40ms_Interrupt_Init(void) {
-  TIM2->SR &= ~(0x1UL << 0U); 
-  TIM2->PSC = 6399;           // 64 MHz / 6400 = 10 kHz
-  TIM2->CNT = 0;
-  TIM2->ARR = 399;            // 10 kHz / 400 = 25 Hz = 40 ms
-  TIM2->DIER |= (0x1UL << 0U);      // enable UIE
-  NVIC->ISER[0U] |= (0x1UL << 28U);
-  TIM2->CR1 |= (0x1UL << 0U);       // start timer
-}
-
-void TIM3_Delay_10ms_Interrupt(void) {
+void TIM3_Delay_10ms_Interrupt_Config(void) {
   TIM3->SR &= ~(0x1UL << 0U); // clear overflow flag
   TIM3->PSC = 9;
   TIM3->CNT = 1536;
@@ -121,11 +113,23 @@ void TIM3_Delay_10ms_Interrupt(void) {
   TIM3->CR1 |= (0x1UL << 0U);       // start timer
 }
 
-void TIM3_Delay_2s_Interrupt(void) {
+void TIM3_Delay_2s_Interrupt_Config(void) {
   TIM3->SR &= ~(0x1UL << 0U); // clear overflow flag
   TIM3->PSC = 1953;
   TIM3->CNT = 29;
   TIM3->ARR = 65535;
+  TIM3->DIER |= (0x1UL << 0U);      // enable UIE
+  NVIC->ISER[0U] |= (0x1UL << 29U); // TIM3 global interrupt at position 29
+  TIM3->CR1 |= (0x1UL << 0U);       // start timer
+}
+
+// TIM3 clock = 64MHz (2x APB1 since APB1 prescaler > 1)
+// PSC=63 -> 1MHz tick, ARR=39999 -> 40ms period
+void TIM3_40ms_Interrupt_Config(void) {
+  TIM3->SR &= ~(0x1UL << 0U); // clear overflow flag
+  TIM3->PSC = 63;
+  TIM3->CNT = 0;
+  TIM3->ARR = 39999;
   TIM3->DIER |= (0x1UL << 0U);      // enable UIE
   NVIC->ISER[0U] |= (0x1UL << 29U); // TIM3 global interrupt at position 29
   TIM3->CR1 |= (0x1UL << 0U);       // start timer
