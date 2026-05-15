@@ -94,7 +94,7 @@ Set the broker address in `esp32-code/esp32-code.ino` to the Raspberry Pi's loca
 ```cpp
 const char broker[] = "192.168.X.X";
 ```
-WiFi credentials go in `esp32-code/arduino_secrets.h`:
+WiFi credentials go here:
 ```cpp
 #define SECRET_SSID "your_ssid"
 #define SECRET_PASS "your_password"
