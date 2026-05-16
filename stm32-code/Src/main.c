@@ -50,7 +50,6 @@ void TIM3_IRQHandler(void) {
 
 int main(void) {
   SystemClock_Config();
-  USART2_Init();
   USART1_Init();
   ADC1_GPIO_Init();
   ADC1_Init();
@@ -80,7 +79,6 @@ int main(void) {
     if (EXT_BUTTON) {
       Delay_10ms_CPU();
       if (EXT_BUTTON) {
-        printf("Button pressed!...\r\n");
         brake_torque = 100.0;
       }
     } else {
@@ -109,7 +107,6 @@ void Transmit_Data(void) {
   len = snprintf(buffer, sizeof(buffer), "VS:%.2f\r\n",
                  EngTrModel_Y.VehicleSpeed);
   USART1_Transmit((uint8_t *)buffer, len);
-
   len =
       snprintf(buffer, sizeof(buffer), "ES:%.2f\r\n", EngTrModel_Y.EngineSpeed);
   USART1_Transmit((uint8_t *)buffer, len);
