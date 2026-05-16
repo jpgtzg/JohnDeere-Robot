@@ -13,14 +13,19 @@ BROKER = "localhost"
 PORT = 1883
 TOPICS = ["robot/engine_speed", "robot/vehicle_speed", "robot/gear"]
 
+DEBUG = True
+
 client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
 write_api = client.write_api(write_options=SYNCHRONOUS)
 
 
 def write_to_influxdb(measurement: str, field: str, value: float):
     point = Point(measurement).tag("client", CLIENT_NAME).field(field, value)
-    write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
-    print(f"Written to influx db: {measurement} - {field}: {value} at {point.time}")
+    if not DEBUG:
+        write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=point)
+        print(f"Written to influx db: {measurement} - {field}: {value} at {point.time}")
+    else:
+        print(f"DEBUG: {measurement} - {field}: {value} at {point.time}")
 
 
 def on_connect(client, userdata, flags, rc):
