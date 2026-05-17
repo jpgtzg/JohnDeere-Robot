@@ -22,7 +22,7 @@ const char gear_topic[]    = "robot/gear";
 // ──────────────────────────────────────────────────────────
 
 void connectWiFi() {
-  WiFi.disconnect(true);   // clear previous state
+  WiFi.disconnect(true);
   WiFi.mode(WIFI_STA);
   delay(100);
 
@@ -33,7 +33,7 @@ void connectWiFi() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    if (++attempts >= 40) {           // 20s timeout → retry
+    if (++attempts >= 40) {
       Serial.println("\nRetrying...");
       WiFi.disconnect();
       delay(1000);
