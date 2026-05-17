@@ -59,20 +59,19 @@ int main(void) {
   PWM_GPIO_Init();
   TIM2_PWM_Init();
 
-  // LCD_Init();
-  // LCD_Set_Cursor(1, 1);
-  // LCD_Put_Str("Transmision Tractor");
-  // LCD_Set_Cursor(2, 3);
-  // Delay_1sec_CPU();
-  // Delay_1sec_CPU();
-  // LCD_Clear();
+  LCD_Init();
+  LCD_Set_Cursor(1, 1);
+  LCD_Put_Str("Transmision Tractor");
+  LCD_Set_Cursor(2, 3);
+  Delay_1sec_CPU();
+  Delay_1sec_CPU();
+  LCD_Clear();
 
   EngTrModel_initialize();
 
   for (;;) {
     if (transmit_ready) {
       transmit_ready = 0;
-      printf("Transmitting now");
       Transmit_Data();
     }
 
@@ -88,15 +87,15 @@ int main(void) {
     double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
     Change_Duty_Cycle(duty);
 
-    // char line[17];
-    // snprintf(line, sizeof(line), "Ac:%4.0f   M:%u", (double)adc_value,
-    //          (unsigned)EngTrModel_Y.Gear);
-    // LCD_Set_Cursor(1, 1);
-    // LCD_Put_Str(line);
+    char line[17];
+    snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
+             (unsigned)EngTrModel_Y.Gear);
+    LCD_Set_Cursor(1, 1);
+    LCD_Put_Str(line);
 
-    // snprintf(line, sizeof(line), "RPM:%8.1f  ", EngTrModel_Y.VehicleSpeed);
-    // LCD_Set_Cursor(2, 1);
-    // LCD_Put_Str(line);
+    snprintf(line, sizeof(line), "RPM:%8.1f  ", EngTrModel_Y.EngineSpeed);
+    LCD_Set_Cursor(2, 1);
+    LCD_Put_Str(line);
   }
 }
 

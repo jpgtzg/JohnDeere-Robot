@@ -98,14 +98,14 @@ void LCD_Init(void){
 	GPIOC->BSRR	 =	 LCD_D6_PIN_LOW;
 	GPIOC->BSRR	 =	 LCD_D7_PIN_LOW;
 	LCD_Pulse_EN( );
-	while( LCD_Busy( ) );//						checking the busy flag
+	delay_us(100U);//						wait instead of busy check (still in 8-bit mode)
 	/* Initial 'Function Set' to change 4-bit mode 			*/
 	GPIOC->BSRR	 =	 LCD_D4_PIN_LOW;
 	GPIOC->BSRR	 =	 LCD_D5_PIN_HIGH;
 	GPIOC->BSRR	 =	 LCD_D6_PIN_LOW;
 	GPIOC->BSRR	 =	 LCD_D7_PIN_LOW;
 	LCD_Pulse_EN( );
-	while( LCD_Busy( ) );//						checking the busy flag
+	delay_ms_lcd(2U);//						wait instead of busy check (4-bit mode not yet stable)
 	/* 'Function Set' (I=1, N and F as required)			*/
 	LCD_Write_Cmd( 0x28U );//					2-line display, 5x7 dot
 	/* 'Display ON/OFF Control' (D=0, C=0, B=0)			*/
@@ -157,7 +157,7 @@ void LCD_Write_Byte(uint8_t val){
 	LCD_Pulse_EN( );
 	LCD_Out_Data4( val & 0x0FU );
 	LCD_Pulse_EN( );
-	while( LCD_Busy( ) );
+	delay_ms_lcd(2U);
 }
 
 //Funcion que escribe un comando en el LCD
@@ -212,6 +212,7 @@ void LCD_Put_Num(int16_t num){
 
 //Funcion que provoca tiempos de espera en el LCD
 char LCD_Busy(void){
+	char busy;
 /**
   * Configuracion de D7 as input floating
   */
@@ -219,27 +220,23 @@ char LCD_Busy(void){
 	GPIOC->CRH	|=   ( 0x1UL << 18U );
 	GPIOC->BSRR	 =	 LCD_RS_PIN_LOW;
 	GPIOC->BSRR	 =	 LCD_RW_PIN_HIGH;
+	/* Read high nibble (contains busy flag on D7) */
 	GPIOC->BSRR	 =	 LCD_EN_PIN_HIGH;
-	delay_us(100U);// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! wait for 100us
-	if(( GPIOC->IDR	& LCD_D7_PIN_HIGH )) {//			if D7 is set, then
-		GPIOC->BSRR	= 	LCD_EN_PIN_LOW;
-		GPIOC->BSRR	=	LCD_RW_PIN_LOW;
+	delay_us(100U);
+	busy = ( GPIOC->IDR & LCD_D7_PIN_HIGH ) ? 1 : 0;
+	GPIOC->BSRR	 =	 LCD_EN_PIN_LOW;
+	delay_us(10U);
+	/* Read low nibble (dummy, required to keep 4-bit state machine in sync) */
+	GPIOC->BSRR	 =	 LCD_EN_PIN_HIGH;
+	delay_us(100U);
+	GPIOC->BSRR	 =	 LCD_EN_PIN_LOW;
+	GPIOC->BSRR	 =	 LCD_RW_PIN_LOW;
 /**
   * Configuracion de D7 as output push-pull, 10 MHz speed
   */
-		GPIOC->CRH	&=	~( 0x3UL << 18U ) & ~( 0x2UL << 16U );
-		GPIOC->CRH	|=   ( 0x1UL << 16U );
-		return 1;
-	} else {
-		GPIOC->BSRR	= 	LCD_EN_PIN_LOW;
-		GPIOC->BSRR	=	LCD_RW_PIN_LOW;
-/**
-  * Configuracion de D7 as output push-pull, 10 MHz speed
-  */
-		GPIOC->CRH	&=	~( 0x3UL << 18U ) & ~( 0x2UL << 16U );
-		GPIOC->CRH	|=   ( 0x1UL << 16U );
-		return 0;
-	}
+	GPIOC->CRH	&=	~( 0x3UL << 18U ) & ~( 0x2UL << 16U );
+	GPIOC->CRH	|=   ( 0x1UL << 16U );
+	return busy;
 }
 
 //Funcion que genera un pulso en el pin EN del LCD
