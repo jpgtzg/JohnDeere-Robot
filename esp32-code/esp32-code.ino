@@ -19,6 +19,8 @@ const char engine_topic[]  = "robot/engine_speed";
 const char vehicle_topic[] = "robot/vehicle_speed";
 const char gear_topic[]    = "robot/gear";
 
+const bool MQTT_ENABLED = true;
+
 // ──────────────────────────────────────────────────────────
 
 void connectWiFi() {
@@ -65,12 +67,15 @@ void setup() {
 
   connectWiFi();
 
-  Serial.printf("Connecting to MQTT broker %s...\n", broker);
-  if (!mqttClient.connect(broker, port)) {
-    Serial.printf("MQTT failed! Error: %d\n", mqttClient.connectError());
-    while (1);
+  if(MQTT_ENABLED){
+    Serial.printf("Connecting to MQTT broker %s...\n", broker);
+    if (!mqttClient.connect(broker, port)) {
+      Serial.printf("MQTT failed! Error: %d\n", mqttClient.connectError());
+      while (1);
+    }
+    Serial.println("MQTT connected!");
   }
-  Serial.println("MQTT connected!");
+  Serial.println("Connected, MQTT disabled");
 }
 
 void loop() {
@@ -80,14 +85,18 @@ void loop() {
     connectWiFi();
   }
 
-  mqttClient.poll();
+  if(MQTT_ENABLED){
+    mqttClient.poll();
+  }
 
   while (STM32_SERIAL.available()) {
     String line = STM32_SERIAL.readStringUntil('\n');
     line.trim();
     if (line.length() > 0) {
       Serial.println("STM32 → " + line);
-      parseLine(line);
+      if(MQTT_ENABLED){
+        parseLine(line);
+      }
     }
   }
 }
