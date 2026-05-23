@@ -73,6 +73,16 @@ int main(void) {
     if (transmit_ready) {
       transmit_ready = 0;
       Transmit_Data();
+
+      char line[17];
+      snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
+               (unsigned)EngTrModel_Y.Gear);
+      LCD_Set_Cursor(1, 1);
+      LCD_Put_Str(line);
+
+      snprintf(line, sizeof(line), "RPM:%8.1f  ", EngTrModel_Y.EngineSpeed);
+      LCD_Set_Cursor(2, 1);
+      LCD_Put_Str(line);
     }
 
     if (EXT_BUTTON) {
@@ -86,16 +96,6 @@ int main(void) {
 
     double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
     Change_Duty_Cycle(duty);
-
-    char line[17];
-    snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
-             (unsigned)EngTrModel_Y.Gear);
-    LCD_Set_Cursor(1, 1);
-    LCD_Put_Str(line);
-
-    snprintf(line, sizeof(line), "RPM:%8.1f  ", EngTrModel_Y.EngineSpeed);
-    LCD_Set_Cursor(2, 1);
-    LCD_Put_Str(line);
   }
 }
 
