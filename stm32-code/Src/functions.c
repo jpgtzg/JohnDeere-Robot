@@ -3,28 +3,21 @@
 
 volatile uint16_t adc_value;
 
-void SystemClock_Config(void) {
-  FLASH->ACR &= ~(
-      0x5UL << 0U); //		two wait states latency, if SYSCLK > 48MHz
-  FLASH->ACR |=
-      (0x2UL << 0U);             //		two wait states latency, if SYSCLK > 48MHz
-  RCC->CFGR &= ~(0x1UL << 16U)   //			PLL HSI oscillator clock
-                                 /// 2 selected as PLL input clock
-               & ~(0x7UL << 11U) // 		APB2 prescaler /1
-               & ~(0x3UL << 8U); // 		APB1 prescaler /2
-  RCC->CFGR |=
-      (0xFUL << 18U)         //			PLL input clock x 16 (PLLMUL bits)
-      | (0x4UL << 8U);       //		APB1 prescaler /2
-  RCC->CR |= (0x1UL << 24U); //		PLL2 ON
-  while (!(RCC->CR & ~(0x1UL << 25U)))
-    ;                          //	wait until PLL is locked
-  RCC->CFGR &= ~(0x1UL << 0U); //		PLL used as system clock (SW
-                               // bits)
-  RCC->CFGR |= (0x2UL << 0U);  //		PLL used as system clock (SW
-                               // bits)
-  while (0x8UL != (RCC->CFGR & 0xCUL))
-    ; //	wait until PLL is switched
+void SystemClock_Config( void ){
+	FLASH->ACR	&=	~( 0x5UL <<  0U );//		two wait states latency, if SYSCLK > 48MHz
+	FLASH->ACR	|=	 ( 0x2UL <<  0U );//		two wait states latency, if SYSCLK > 48MHz
+	RCC->CFGR	&=	~( 0x1UL << 16U )//			PLL HSI oscillator clock /2 selected as PLL input clock
+				&	~( 0x7UL << 11U )// 		APB2 prescaler /1
+				&	~( 0x3UL <<  8U );// 		APB1 prescaler /2
+	RCC->CFGR	|=	 ( 0xFUL << 18U )//			PLL input clock x 16 (PLLMUL bits)
+				|	 ( 0x4UL <<  8U );//		APB1 prescaler /2
+	RCC->CR		|=	 ( 0x1UL << 24U );//		PLL2 ON
+	while( !(RCC->CR & ~( 0x1UL << 25U )));//	wait until PLL is locked
+	RCC->CFGR	&=	~( 0x1UL << 0U  );//		PLL used as system clock (SW bits)
+	RCC->CFGR	|=	 ( 0x2UL << 0U  );//		PLL used as system clock (SW bits)
+	while( 0x8UL != ( RCC->CFGR & 0xCUL ));//	wait until PLL is switched
 }
+
 
 void Delay_10ms_CPU(void) {
   __asm(" 		ldr r0, =1249999	"); //	load the value to be

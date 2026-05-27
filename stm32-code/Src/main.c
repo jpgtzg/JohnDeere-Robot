@@ -58,6 +58,7 @@ int main(void) {
   EXT_Button_Init();
   PWM_GPIO_Init();
   TIM2_PWM_Init();
+  TIM4_PWM_Init();
 
   LCD_Init();
   LCD_Set_Cursor(1, 1);
@@ -72,7 +73,7 @@ int main(void) {
   for (;;) {
     if (transmit_ready) {
       transmit_ready = 0;
-      Transmit_Data();
+      // Transmit_Data();
 
       char line[17];
       snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
@@ -95,7 +96,10 @@ int main(void) {
     }
 
     double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
-    Change_Duty_Cycle(duty);
+    Change_Duty_Cycle_M1(duty);
+    Change_Duty_Cycle_M2(duty);
+    Change_Duty_Cycle_M3(duty);
+    Change_Duty_Cycle_M4(duty);
   }
 }
 
