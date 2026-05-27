@@ -24,6 +24,7 @@
 #include "EngTrModel.h"
 #include "functions.h"
 #include "lcd.h"
+#include "motor.h"
 #include "ports.h"
 #include "pwm.h"
 #include "timer.h"
@@ -59,14 +60,16 @@ int main(void) {
   PWM_GPIO_Init();
   TIM2_PWM_Init();
   TIM4_PWM_Init();
+  Motor_GPIO_Init();
+  Motor_All_Forward();
 
-  LCD_Init();
-  LCD_Set_Cursor(1, 1);
-  LCD_Put_Str("Transmision Tractor");
-  LCD_Set_Cursor(2, 3);
-  Delay_1sec_CPU();
-  Delay_1sec_CPU();
-  LCD_Clear();
+  // LCD_Init();
+  // LCD_Set_Cursor(1, 1);
+  // LCD_Put_Str("Transmision Tractor");
+  // LCD_Set_Cursor(2, 3);
+  // Delay_1sec_CPU();
+  // Delay_1sec_CPU();
+  // LCD_Clear();
 
   EngTrModel_initialize();
 
@@ -75,31 +78,31 @@ int main(void) {
       transmit_ready = 0;
       // Transmit_Data();
 
-      char line[17];
-      snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
-               (unsigned)EngTrModel_Y.Gear);
-      LCD_Set_Cursor(1, 1);
-      LCD_Put_Str(line);
+      // char line[17];
+      // snprintf(line, sizeof(line), "Ac:%4.0f   ullG:%u", (double)adc_value,
+      //          (unsigned)EngTrModel_Y.Gear);
+      // LCD_Set_Cursor(1, 1);
+      // LCD_Put_Str(line);
 
-      snprintf(line, sizeof(line), "RPM:%8.1f  ", EngTrModel_Y.EngineSpeed);
-      LCD_Set_Cursor(2, 1);
-      LCD_Put_Str(line);
+      // snprintf(line, sizeof(line), "RPM:%8.1f  ", EngTrModel_Y.EngineSpeed);
+      // LCD_Set_Cursor(2, 1);
+      // LCD_Put_Str(line);
     }
 
-    if (EXT_BUTTON) {
-      Delay_10ms_CPU();
-      if (EXT_BUTTON) {
-        brake_torque = 100.0;
-      }
-    } else {
-      brake_torque = 0;
-    }
+    // if (EXT_BUTTON) {
+    //   Delay_10ms_CPU();
+    //   if (EXT_BUTTON) {
+    //     brake_torque = 100.0;
+    //   }
+    // } else {
+    //   brake_torque = 0;
+    // }
 
-    double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
-    Change_Duty_Cycle_M1(duty);
-    Change_Duty_Cycle_M2(duty);
-    Change_Duty_Cycle_M3(duty);
-    Change_Duty_Cycle_M4(duty);
+    // double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
+    Change_Duty_Cycle_M1(50.0);
+    Change_Duty_Cycle_M2(50.0);
+    Change_Duty_Cycle_M3(50.0);
+    Change_Duty_Cycle_M4(50.0);
   }
 }
 
