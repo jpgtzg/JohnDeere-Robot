@@ -2,7 +2,8 @@
 #include "ports.h"
 
 // ===============================================================================
-// Functions for configuring TIM2 and TIM3 in basic timer mode 
+// Functions for configuring TIM2 and TIM3 in basic timer mode (upcounter,
+// internal clock source) used in both polling and interrupt methods
 // ===============================================================================
 void TIM2_Init(void) {
   // TIM2 clock enable
@@ -27,6 +28,7 @@ void TIM3_Init(void) {
 
 // ===============================================================================
 // Functions for implementing delay functions using polling method
+// (assumes TIM2_Init / TIM3_Init already called for clock and mode setup)
 // ===============================================================================
 
 void TIM2_Delay_10ms_Polling(void) {
@@ -75,6 +77,10 @@ void TIM3_Delay_2s_Polling(void) {
 
 // ===============================================================================
 // Functions for implementing delay functions using interrupt method
+// (assumes TIM2_Init / TIM3_Init already called for clock and mode setup)
+// Remember to implement the corresponding interrupt handlers in your main file
+// to handle the timer interrupts and clear the overflow flags appropriately
+
 // ===============================================================================
 
 void TIM2_Delay_10ms_Interrupt_Config(void) {
@@ -117,7 +123,7 @@ void TIM3_Delay_2s_Interrupt_Config(void) {
   TIM3->CR1 |= (0x1UL << 0U);       // start timer
 }
 
-// TIM3 clock = 64MHz 
+// TIM3 clock = 64MHz (2x APB1 since APB1 prescaler > 1)
 // PSC=63 -> 1MHz tick, ARR=39999 -> 40ms period
 void TIM3_40ms_Interrupt_Config(void) {
   TIM3->SR &= ~(0x1UL << 0U); // clear overflow flag
@@ -127,16 +133,4 @@ void TIM3_40ms_Interrupt_Config(void) {
   TIM3->DIER |= (0x1UL << 0U);      // enable UIE
   NVIC->ISER[0U] |= (0x1UL << 29U); // TIM3 global interrupt at position 29
   TIM3->CR1 |= (0x1UL << 0U);       // start timer
-}
-
-// PSC=63 -> 1MHz tick, ARR=999 -> 1ms period 
-void TIM3_1ms_Interrupt_Config(void) {
-  TIM3->SR &= ~(0x1UL << 0U);
-  TIM3->PSC = 63;
-  TIM3->CNT = 0;
-  TIM3->ARR = 999;
-  TIM3->DIER |= (0x1UL << 0U);      // enable UIE
-  NVIC->ISER[0U] |= (0x1UL << 29U); // TIM3 IRQ position 29
-  NVIC->IP[29]    = (0x0UL << 4U);  // highest NVIC priority
-  TIM3->CR1 |= (0x1UL << 0U);
 }

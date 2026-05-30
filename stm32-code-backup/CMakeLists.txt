@@ -43,8 +43,6 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/scheduler.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Src/tasks.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/functions.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/uart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/timer.c
