@@ -31,9 +31,6 @@
 #include "uart.h"
 #include <stdio.h>
 
-volatile double brake_torque = 0;
-volatile double adc_value_percent = 0;
-volatile uint8_t transmit_ready = 0;
 
 void Transmit_Data(void);
 
@@ -41,19 +38,19 @@ void TIM3_IRQHandler(void) {
   if (TIM3->SR & (0x1UL << 0U)) {
     TIM3->SR &= ~(0x1UL << 0U);
 
-    adc_value_percent = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
-    EngTrModel_U.Throttle = adc_value_percent;
-    EngTrModel_U.BrakeTorque = brake_torque;
+    EngTrModel_U.Throttle = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+    EngTrModel_U.BrakeTorque = EXT_BUTTON ? 100.0 : 0.0;
     EngTrModel_step();
-    transmit_ready = 1;
   }
 }
 
 int main(void) {
+
   SystemClock_Config();
   USART1_Init();
   ADC1_GPIO_Init();
   ADC1_Init();
+  EngTrModel_initialize();
   TIM3_Init();
   TIM3_40ms_Interrupt_Config();
   EXT_Button_Init();
@@ -63,46 +60,31 @@ int main(void) {
   Motor_GPIO_Init();
   Motor_All_Forward();
 
-  // LCD_Init();
-  // LCD_Set_Cursor(1, 1);
-  // LCD_Put_Str("Transmision Tractor");
-  // LCD_Set_Cursor(2, 3);
-  // Delay_1sec_CPU();
-  // Delay_1sec_CPU();
-  // LCD_Clear();
-
-  EngTrModel_initialize();
+  LCD_Init();
+  LCD_Set_Cursor(1, 1);
+  LCD_Put_Str("Transmision Tractor");
+  LCD_Set_Cursor(2, 3);
+  LCD_Clear();
 
   for (;;) {
-    if (transmit_ready) {
-      transmit_ready = 0;
-      // Transmit_Data();
 
-      // char line[17];
-      // snprintf(line, sizeof(line), "Ac:%4.0f   ullG:%u", (double)adc_value,
-      //          (unsigned)EngTrModel_Y.Gear);
-      // LCD_Set_Cursor(1, 1);
-      // LCD_Put_Str(line);
+    double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
+    Change_Duty_Cycle_M1(duty);
+    Change_Duty_Cycle_M2(duty);
+    Change_Duty_Cycle_M3(duty);
+    Change_Duty_Cycle_M4(duty);
 
-      // snprintf(line, sizeof(line), "RPM:%8.1f  ", EngTrModel_Y.EngineSpeed);
-      // LCD_Set_Cursor(2, 1);
-      // LCD_Put_Str(line);
-    }
+    Transmit_Data();
 
-    // if (EXT_BUTTON) {
-    //   Delay_10ms_CPU();
-    //   if (EXT_BUTTON) {
-    //     brake_torque = 100.0;
-    //   }
-    // } else {
-    //   brake_torque = 0;
-    // }
+    char line[17];
+    snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
+             (unsigned)EngTrModel_Y.Gear);
+    LCD_Set_Cursor(1, 1);
+    LCD_Put_Str(line);
 
-    // double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
-    Change_Duty_Cycle_M1(50.0);
-    Change_Duty_Cycle_M2(50.0);
-    Change_Duty_Cycle_M3(50.0);
-    Change_Duty_Cycle_M4(50.0);
+    snprintf(line, sizeof(line), "Speed:%8.1f  ", EngTrModel_Y.VehicleSpeed);
+    LCD_Set_Cursor(2, 1);
+    LCD_Put_Str(line);
   }
 }
 
