@@ -31,72 +31,128 @@
 #include "uart.h"
 #include <stdio.h>
 
+volatile uint8_t brake_active = 0;
+volatile uint8_t task_flag    = 0;
 
-void Transmit_Data(void);
+void TASK_Sensor_Init(void);
+void TASK_Sensor(void);
+
+void TASK_Controller_Init(void);
+void TASK_Controller(void);
+
+void TASK_Motor_Init(void);
+void TASK_Motor(void);
+
+void TASK_Display_Init(void);
+void TASK_Display(void);
+
+void TASK_Comm_Init(void);
+void TASK_Comm(void);
 
 void TIM3_IRQHandler(void) {
   if (TIM3->SR & (0x1UL << 0U)) {
     TIM3->SR &= ~(0x1UL << 0U);
 
-    EngTrModel_U.Throttle = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
-    EngTrModel_U.BrakeTorque = EXT_BUTTON ? 100.0 : 0.0;
-    EngTrModel_step();
+    TASK_Sensor();
+    TASK_Controller();
+    task_flag = 1;
   }
 }
 
 int main(void) {
 
   SystemClock_Config();
-  USART1_Init();
+
+  TASK_Sensor_Init();
+  TASK_Controller_Init();
+  TASK_Motor_Init();
+  TASK_Display_Init();
+  TASK_Comm_Init();
+
+  for (;;) {
+    if (task_flag) {
+      task_flag = 0;
+
+      TASK_Motor();
+      TASK_Display();
+      TASK_Comm();
+    }
+  }
+}
+
+void TASK_Sensor_Init(void) {
   ADC1_GPIO_Init();
   ADC1_Init();
+  EXT_Button_Init();
+}
+
+void TASK_Sensor(void) {
+  brake_active = EXT_BUTTON ? 1 : 0;
+}
+
+// Note, the ADC value is handled by the interrupt, so we don't read it here. Instead, we just update the model inputs
+void TASK_Controller_Init(void) {
   EngTrModel_initialize();
   TIM3_Init();
   TIM3_40ms_Interrupt_Config();
-  EXT_Button_Init();
+}
+
+void TASK_Controller(void) {
+  EngTrModel_U.Throttle   = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+  EngTrModel_U.BrakeTorque = brake_active ? 100.0 : 0.0;
+  EngTrModel_step();
+}
+
+void TASK_Motor_Init(void) {
   PWM_GPIO_Init();
   TIM2_PWM_Init();
   TIM4_PWM_Init();
   Motor_GPIO_Init();
   Motor_All_Forward();
-
-  LCD_Init();
-  LCD_Set_Cursor(1, 1);
-  LCD_Put_Str("Transmision Tractor");
-  LCD_Set_Cursor(2, 3);
-  LCD_Clear();
-
-  for (;;) {
-
-    double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
-    Change_Duty_Cycle_M1(duty);
-    Change_Duty_Cycle_M2(duty);
-    Change_Duty_Cycle_M3(duty);
-    Change_Duty_Cycle_M4(duty);
-
-    Transmit_Data();
-
-    char line[17];
-    snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
-             (unsigned)EngTrModel_Y.Gear);
-    LCD_Set_Cursor(1, 1);
-    LCD_Put_Str(line);
-
-    snprintf(line, sizeof(line), "Speed:%8.1f  ", EngTrModel_Y.VehicleSpeed);
-    LCD_Set_Cursor(2, 1);
-    LCD_Put_Str(line);
-  }
 }
 
-void Transmit_Data(void) {
-  char buffer[32];
+void TASK_Motor(void) {
+  double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
+  Change_Duty_Cycle_M1(duty);
+  Change_Duty_Cycle_M2(duty);
+  Change_Duty_Cycle_M3(duty);
+  Change_Duty_Cycle_M4(duty);
+}
+
+void TASK_Display_Init(void) {
+  LCD_Init();
+  LCD_Clear();
+  LCD_Set_Cursor(1, 1);
+  LCD_Put_Str("Transmision Tractor");
+}
+
+void TASK_Display(void) {
+  char line[17];
+
+  snprintf(line, sizeof(line), "Ac:%4.0f   G:%u",
+           (double)adc_value, (unsigned)EngTrModel_Y.Gear);
+  LCD_Set_Cursor(1, 1);
+  LCD_Put_Str(line);
+
+  snprintf(line, sizeof(line), "Speed:%8.1f  ", EngTrModel_Y.VehicleSpeed);
+  LCD_Set_Cursor(2, 1);
+  LCD_Put_Str(line);
+}
+
+void TASK_Comm_Init(void) {
+  USART1_Init();
+}
+
+void TASK_Comm(void) {
+  char     buffer[32];
   uint16_t len;
 
   len = snprintf(buffer, sizeof(buffer), "VS:%.2f\r\n",
                  EngTrModel_Y.VehicleSpeed);
   USART1_Transmit((uint8_t *)buffer, len);
-  len =
-      snprintf(buffer, sizeof(buffer), "ES:%.2f\r\n", EngTrModel_Y.EngineSpeed);
+
+  len = snprintf(buffer, sizeof(buffer), "ES:%.2f\r\n",
+                 EngTrModel_Y.EngineSpeed);
   USART1_Transmit((uint8_t *)buffer, len);
 
   len = snprintf(buffer, sizeof(buffer), "GR:%.2f\r\n", EngTrModel_Y.Gear);
