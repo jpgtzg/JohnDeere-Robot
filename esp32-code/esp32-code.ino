@@ -19,7 +19,7 @@ const char engine_topic[]  = "robot/engine_speed";
 const char vehicle_topic[] = "robot/vehicle_speed";
 const char gear_topic[]    = "robot/gear";
 
-const bool MQTT_ENABLED = true;
+const bool MQTT_ENABLED = false;
 
 // ──────────────────────────────────────────────────────────
 
@@ -63,7 +63,7 @@ void parseLine(const String& line) {
 
 void setup() {
   Serial.begin(9600);
-  STM32_SERIAL.begin(STM32_BAUD, SERIAL_8N1, 3, 1);
+  STM32_SERIAL.begin(STM32_BAUD, SERIAL_8N1, 16, 17);
 
   connectWiFi();
 
