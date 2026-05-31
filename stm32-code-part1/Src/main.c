@@ -33,6 +33,7 @@
 
 volatile uint8_t brake_active = 0;
 volatile uint8_t task_flag = 0;
+volatile double duty = 0;
 
 void TASK_Sensor_Init(void);
 void TASK_Sensor(void);
@@ -98,7 +99,7 @@ void TASK_Motor_Init(void) {
 }
 
 void TASK_Motor(void) {
-  double duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
+  duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
   Change_Duty_Cycle_M1(duty);
   Change_Duty_Cycle_M2(duty);
   Change_Duty_Cycle_M3(duty);
@@ -108,19 +109,17 @@ void TASK_Motor(void) {
 void TASK_Display_Init(void) {
   LCD_Init();
   LCD_Clear();
-  LCD_Set_Cursor(1, 1);
-  LCD_Put_Str("Transmision Tractor");
 }
 
 void TASK_Display(void) {
   char line[17];
 
-  snprintf(line, sizeof(line), "Ac:%4.0f   G:%u", (double)adc_value,
+  snprintf(line, sizeof(line), "Duty:%4.0f%% G:%-3u", (double)duty,
            (unsigned)EngTrModel_Y.Gear);
   LCD_Set_Cursor(1, 1);
   LCD_Put_Str(line);
 
-  snprintf(line, sizeof(line), "Speed:%8.1f  ", EngTrModel_Y.VehicleSpeed);
+  snprintf(line, sizeof(line), "RPM:%10.1f    ", EngTrModel_Y.EngineSpeed);
   LCD_Set_Cursor(2, 1);
   LCD_Put_Str(line);
 }
