@@ -31,10 +31,18 @@
 #include "uart.h"
 #include <stdio.h>
 
+/* ---------------------------------------------------------------------------
+ * Global variables shared between tasks
+ * brake_active : Written by TASK_Sensor, read by TASK_Controller
+ * duty         : Written by TASK_Motor, read by TASK_Display
+ * --------------------------------------------------------------------------- */
 volatile uint8_t brake_active = 0;
-volatile uint8_t task_flag = 0;
-volatile double duty = 0;
+volatile double  duty         = 0;
+volatile uint16_t adc_value     = 0;
 
+/* ---------------------------------------------------------------------------
+ * Task prototypes
+ * --------------------------------------------------------------------------- */
 void TASK_Sensor_Init(void);
 void TASK_Sensor(void);
 
@@ -50,46 +58,179 @@ void TASK_Display(void);
 void TASK_Comm_Init(void);
 void TASK_Comm(void);
 
-// Note, we removed the IRQ handler because the instructions was to use a cyclic
-// structure, but it is not the correct way to do it as it doesnt guarantee the
-// 40ms timing.
+/* Timing measurement timer (TIM3 — free since IRQ scheduler was removed;
+ * TIM4 is reserved for PWM).
+ * PSC = 999, clock = 64 MHz  →  1 count = 15.625 µs, max range ≈ 1.024 s */
+void USER_TIM3_Init_Timer(void);
+
+/* ---------------------------------------------------------------------------
+ * Main
+ * Note: the IRQ-based scheduler was removed per assignment instructions.
+ * All tasks are called sequentially in the super-loop (cyclic executive).
+ * TIM3 is used only for execution-time measurement and is NOT used for
+ * periodic triggering.
+ * --------------------------------------------------------------------------- */
 int main(void) {
+
+  uint16_t t_start, t_end, t_total;
+  float    t_s;
 
   SystemClock_Config();
 
+  /* Initialize USART2 first — printf/_write routes through USART2 */
+  USART2_Init();
+  USER_TIM3_Init_Timer();
+
+  /* -------------------------------------------------------------------------
+   * Measure Init execution times
+   * ---------------------------------------------------------------------- */
+  TIM3->CNT = 0;
+  t_start   = TIM3->CNT;
   TASK_Sensor_Init();
+  t_end   = TIM3->CNT;
+  t_total = t_end - t_start;
+  t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+  printf("Sensor_Init:     %.6f s\r\n", t_s);
+
+  TIM3->CNT = 0;
+  t_start   = TIM3->CNT;
   TASK_Controller_Init();
+  t_end   = TIM3->CNT;
+  t_total = t_end - t_start;
+  t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+  printf("Controller_Init: %.6f s\r\n", t_s);
+
+  TIM3->CNT = 0;
+  t_start   = TIM3->CNT;
   TASK_Motor_Init();
+  t_end   = TIM3->CNT;
+  t_total = t_end - t_start;
+  t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+  printf("Motor_Init:      %.6f s\r\n", t_s);
+
+  TIM3->CNT = 0;
+  t_start   = TIM3->CNT;
   TASK_Display_Init();
+  t_end   = TIM3->CNT;
+  t_total = t_end - t_start;
+  t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+  printf("Display_Init:    %.6f s\r\n", t_s);
+
+  TIM3->CNT = 0;
+  t_start   = TIM3->CNT;
   TASK_Comm_Init();
+  t_end   = TIM3->CNT;
+  t_total = t_end - t_start;
+  t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+  printf("Comm_Init:       %.6f s\r\n", t_s);
+
 
   for (;;) {
+
+    TIM3->CNT = 0;
+    t_start   = TIM3->CNT;
     TASK_Sensor();
+    t_end   = TIM3->CNT;
+    t_total = t_end - t_start;
+    t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+    printf("Sensor:     %.6f s\r\n", t_s);
+
+    TIM3->CNT = 0;
+    t_start   = TIM3->CNT;
     TASK_Controller();
+    t_end   = TIM3->CNT;
+    t_total = t_end - t_start;
+    t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+    printf("Controller: %.6f s\r\n", t_s);
+
+    TIM3->CNT = 0;
+    t_start   = TIM3->CNT;
     TASK_Motor();
+    t_end   = TIM3->CNT;
+    t_total = t_end - t_start;
+    t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+    printf("Motor:      %.6f s\r\n", t_s);
+
+    TIM3->CNT = 0;
+    t_start   = TIM3->CNT;
     TASK_Display();
+    t_end   = TIM3->CNT;
+    t_total = t_end - t_start;
+    t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+    printf("Display:    %.6f s\r\n", t_s);
+
+    TIM3->CNT = 0;
+    t_start   = TIM3->CNT;
     TASK_Comm();
+    t_end   = TIM3->CNT;
+    t_total = t_end - t_start;
+    t_s     = (1.0f / 64000000.0f) * t_total * (TIM3->PSC + 1);
+    printf("Comm:       %.6f s\r\n", t_s);
+
+    printf("---\r\n");
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Timing measurement timer
+ * Uses TIM3 as a free-running upcounter.
+ * PSC = 999, f_clk = 64 MHz  →  tick = 15.625 µs, overflow at ~1.024 s
+ * --------------------------------------------------------------------------- */
+void USER_TIM3_Init_Timer(void) {
+  RCC->APB1ENR |=  (0x1UL << 1U);   /* enable TIM3 clock                    */
+  TIM3->SMCR   &= ~(0x7UL << 0U);   /* internal clock source                */
+  TIM3->CR1    &= ~(0x3UL << 5U)    /* edge-aligned mode                    */
+               &  ~(0x1UL << 4U)    /* upcounter                            */
+               &  ~(0x1UL << 1U);   /* update event (UEV) enabled           */
+  TIM3->SR     &= ~(0x1UL << 0U);   /* clear overflow flag                  */
+  TIM3->PSC     =   999;             /* 1 count = 15.625 µs @ 64 MHz        */
+  TIM3->EGR    |=  (0x1UL << 0U);   /* latch prescaler value                */
+  TIM3->CNT     =   0;
+  TIM3->CR1    |=  (0x1UL << 0U);   /* start timer                          */
+}
+
+/* ===========================================================================
+ * TASK_Sensor
+ * Reads the brake button. ADC value is updated asynchronously by ADC IRQ.
+ * Outputs: brake_active (global)
+ * =========================================================================== */
 void TASK_Sensor_Init(void) {
   ADC1_GPIO_Init();
   ADC1_Init();
   EXT_Button_Init();
 }
 
-// Note, the ADC value is handled by the interrupt, so we don't read it here.
-// Instead, we just update the model inputs
-void TASK_Sensor(void) { brake_active = EXT_BUTTON ? 1 : 0; }
+void TASK_Sensor(void) {
+  brake_active = EXT_BUTTON ? 1 : 0;
 
-void TASK_Controller_Init(void) { EngTrModel_initialize(); }
+  ADC1->CR2 |= (0x1UL << 22U);         // trigger conversion (SWSTART)
+  while (!(ADC1->SR & (0x1UL << 1U))); // wait for EOC (~1.75 µs)
+  adc_value = ADC1->DR & 0xFFFF;       // read result; also clears EOC flag
+}
+
+/* ===========================================================================
+ * TASK_Controller
+ * Steps the engine/transmission model with current sensor inputs.
+ * Inputs:  adc_value (extern), brake_active (global)
+ * Outputs: EngTrModel_Y.VehicleSpeed, EngTrModel_Y.EngineSpeed,
+ *          EngTrModel_Y.Gear
+ * =========================================================================== */
+void TASK_Controller_Init(void) {
+  EngTrModel_initialize();
+}
 
 void TASK_Controller(void) {
-  EngTrModel_U.Throttle = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
+  EngTrModel_U.Throttle    = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
   EngTrModel_U.BrakeTorque = brake_active ? 100.0 : 0.0;
   EngTrModel_step();
 }
 
+/* ===========================================================================
+ * TASK_Motor
+ * Converts vehicle speed into a PWM duty cycle for all four motors.
+ * Inputs:  EngTrModel_Y.VehicleSpeed (global)
+ * Outputs: duty (global), motor PWM registers
+ * =========================================================================== */
 void TASK_Motor_Init(void) {
   PWM_GPIO_Init();
   TIM2_PWM_Init();
@@ -106,6 +247,11 @@ void TASK_Motor(void) {
   Change_Duty_Cycle_M4(duty);
 }
 
+/* ===========================================================================
+ * TASK_Display
+ * Renders duty cycle, gear, and engine RPM on the 16x2 LCD.
+ * Inputs:  duty (global), EngTrModel_Y.Gear, EngTrModel_Y.EngineSpeed
+ * =========================================================================== */
 void TASK_Display_Init(void) {
   LCD_Init();
   LCD_Clear();
@@ -114,28 +260,38 @@ void TASK_Display_Init(void) {
 void TASK_Display(void) {
   char line[17];
 
-  snprintf(line, sizeof(line), "Duty:%4.0f%% G:%-3u", (double)duty,
-           (unsigned)EngTrModel_Y.Gear);
+  /* Line 1: "Duty: XX%  G:X  "  (16 chars) */
+  snprintf(line, sizeof(line), "Duty:%4.0f%% G:%-3u",
+           (double)duty, (unsigned)EngTrModel_Y.Gear);
   LCD_Set_Cursor(1, 1);
   LCD_Put_Str(line);
 
-  snprintf(line, sizeof(line), "RPM:%10.1f    ", EngTrModel_Y.EngineSpeed);
+  /* Line 2: "RPM:   XXXX.X   "  (16 chars) */
+  snprintf(line, sizeof(line), "RPM:%10.1f  ", EngTrModel_Y.EngineSpeed);
   LCD_Set_Cursor(2, 1);
   LCD_Put_Str(line);
 }
 
-void TASK_Comm_Init(void) { USART1_Init(); }
+/* ===========================================================================
+ * TASK_Comm
+ * Transmits vehicle speed, engine speed, and gear over UART.
+ * Inputs:  EngTrModel_Y.VehicleSpeed, EngTrModel_Y.EngineSpeed,
+ *          EngTrModel_Y.Gear
+ * =========================================================================== */
+void TASK_Comm_Init(void) {
+  USART1_Init();
+}
 
 void TASK_Comm(void) {
-  char buffer[32];
+  char     buffer[32];
   uint16_t len;
 
   len = snprintf(buffer, sizeof(buffer), "VS:%.2f\r\n",
                  EngTrModel_Y.VehicleSpeed);
   USART1_Transmit((uint8_t *)buffer, len);
 
-  len =
-      snprintf(buffer, sizeof(buffer), "ES:%.2f\r\n", EngTrModel_Y.EngineSpeed);
+  len = snprintf(buffer, sizeof(buffer), "ES:%.2f\r\n",
+                 EngTrModel_Y.EngineSpeed);
   USART1_Transmit((uint8_t *)buffer, len);
 
   len = snprintf(buffer, sizeof(buffer), "GR:%.2f\r\n", EngTrModel_Y.Gear);

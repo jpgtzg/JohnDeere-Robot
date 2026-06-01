@@ -1,8 +1,6 @@
 #include "functions.h"
 #include "ports.h"
 
-volatile uint16_t adc_value;
-
 void SystemClock_Config( void ){
 	FLASH->ACR	&=	~( 0x5UL <<  0U );//		two wait states latency, if SYSCLK > 48MHz
 	FLASH->ACR	|=	 ( 0x2UL <<  0U );//		two wait states latency, if SYSCLK > 48MHz
@@ -97,32 +95,22 @@ void ADC1_GPIO_Init(void) {
 }
 
 void ADC1_Init(void) {
-  RCC->APB2ENR |= (0x1UL << 9U); // enable ADC1 clock
-  RCC->CFGR |= (0x3UL << 14U);   // ADC prescaler /8 (PCLK2 64MHz → 8MHz)
+  RCC->APB2ENR |= (0x1UL << 9U);  // enable ADC1 clock
+  RCC->CFGR    |= (0x3UL << 14U); // ADC prescaler /8 (PCLK2 64MHz → 8MHz)
 
   ADC1->CR1 &= ~(0xFUL << 16U); // independent mode
-  ADC1->CR1 |= (0x1UL << 5U);   // EOC interrupt enable
+  ADC1->CR1 &= ~(0x1UL <<  5U); // EOC interrupt disabled — polled by TASK_Sensor
 
   ADC1->CR2 &= ~(0x1UL << 11U); // right alignment
-  ADC1->CR2 |= (0x1UL << 1U);   // continuous conversion mode
+  ADC1->CR2 &= ~(0x1UL <<  1U); // single conversion mode (not continuous)
+  ADC1->CR2 |=  (0x7UL << 17U); // EXTSEL = 111: SWSTART as trigger source
+  ADC1->CR2 |=  (0x1UL << 20U); // EXTTRIG enable
 
-  ADC1->SMPR2 &= ~(0x7UL << 0U); // channel 0 sample time: 1.5 cycles
-  ADC1->SQR1 &= ~(0xFUL << 20U); // 1 conversion in regular sequence
-  ADC1->SQR3 &= ~(0x1FUL << 0U); // channel 0 first in sequence
-
-  NVIC->ISER[0] |= (0x1UL << 18U); // enable ADC1_2 IRQ (18)
-  NVIC->IP[18] = (0x10UL << 4U);   // priority 1
+  ADC1->SMPR2 &= ~(0x7UL <<  0U); // channel 0 sample time: 1.5 cycles
+  ADC1->SQR1  &= ~(0xFUL << 20U); // 1 conversion in regular sequence
+  ADC1->SQR3  &= ~(0x1FUL << 0U); // channel 0 first in sequence
 
   ADC1->CR2 |= (0x1UL << 0U); // enable ADC1
   ADC1->CR2 |= (0x1UL << 2U); // start calibration
-  while (ADC1->CR2 & (0x1UL << 2U))
-    ;                         // wait for calibration to complete
-  ADC1->CR2 |= (0x1UL << 0U); // start conversions
-}
-
-void ADC1_2_IRQHandler(void) {
-  if (ADC1->SR & (0x1UL << 1U)) {
-    adc_value = ADC1->DR & 0xFFFF;
-    ADC1->SR &= ~(0x1UL << 1U);
-  }
+  while (ADC1->CR2 & (0x1UL << 2U)); // wait for calibration to complete
 }
