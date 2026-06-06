@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "influxdb>=5.3.2",
     "influxdb-client>=1.50.0",
-    "mediapipe>=0.10.35",
+    "mediapipe>=0.10.35; sys_platform != 'linux' or platform_machine != 'aarch64'",
     "opencv-python>=4.13.0.92",
     "paho-mqtt>=2.1.0",
 ]
