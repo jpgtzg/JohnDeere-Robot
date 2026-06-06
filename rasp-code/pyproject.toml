@@ -5,9 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "ai-edge-litert>=2.1.5",
     "influxdb>=5.3.2",
     "influxdb-client>=1.50.0",
-    "mediapipe>=0.10.35; sys_platform != 'linux' or platform_machine != 'aarch64'",
     "opencv-python>=4.13.0.92",
     "paho-mqtt>=2.1.0",
 ]
