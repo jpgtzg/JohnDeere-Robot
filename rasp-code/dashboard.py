@@ -28,11 +28,19 @@ API_URL = "http://localhost:5000"
 MEASUREMENT = "tractor_metrics"
 DRIVER_MEASUREMENT = "driver_metrics"
 
-ENGINE_RPM_MAX = 4000  # gauge full-scale
+ENGINE_RPM_MAX = 5000  # gauge full-scale (Grafana Panel A)
 VEHICLE_SPEED_MAX = 40  # km/h, gauge full-scale
-REFRESH_SECONDS = 2
-TIMESERIES_WINDOW = "-10m"
+REFRESH_SECONDS = 5  # auto-refresh (Grafana: 5s)
+TIMESERIES_WINDOW = "-5m"  # last 5 minutes (Grafana Panel B)
+AGG_WINDOW = "5s"  # aggregateWindow mean bucket
 LATEST_WINDOW = "-5m"
+
+# RPM tachometer thresholds (Grafana Panel A): green / yellow / red
+RPM_STEPS = [
+    {"range": [0, 2500], "color": "#D9EAD3"},
+    {"range": [2500, 3500], "color": "#FFF2CC"},
+    {"range": [3500, ENGINE_RPM_MAX], "color": "#F4CCCC"},
+]
 
 CAMERA_STREAM_PORT = 8080  # must match STREAM_PORT used by face.py
 CAMERA_HEIGHT = 340
@@ -97,6 +105,7 @@ def time_series(field: str, measurement: str = MEASUREMENT) -> pd.DataFrame:
         from(bucket: "{INFLUX_BUCKET}")
           |> range(start: {TIMESERIES_WINDOW})
           |> filter(fn: (r) => r._measurement == "{measurement}" and r._field == "{field}")
+          |> aggregateWindow(every: {AGG_WINDOW}, fn: mean, createEmpty: false)
           |> keep(columns: ["_time", "_value"])
           |> sort(columns: ["_time"])
     """
@@ -166,8 +175,14 @@ def kpi_card(label: str, value: str, accent: str = JD_GREEN):
     )
 
 
-def gauge(value, max_value, suffix, bar_color=JD_GREEN):
+def gauge(value, max_value, suffix, bar_color=JD_GREEN, steps=None):
     val = value if value is not None else 0
+    if steps is None:
+        steps = [
+            {"range": [0, max_value * 0.6], "color": "#E8F0E5"},
+            {"range": [max_value * 0.6, max_value * 0.85], "color": "#FBF6C8"},
+            {"range": [max_value * 0.85, max_value], "color": "#F3D2CC"},
+        ]
     return go.Figure(
         go.Indicator(
             mode="gauge+number",
@@ -176,11 +191,7 @@ def gauge(value, max_value, suffix, bar_color=JD_GREEN):
             gauge={
                 "axis": {"range": [0, max_value]},
                 "bar": {"color": bar_color},
-                "steps": [
-                    {"range": [0, max_value * 0.6], "color": "#E8F0E5"},
-                    {"range": [max_value * 0.6, max_value * 0.85], "color": "#FBF6C8"},
-                    {"range": [max_value * 0.85, max_value], "color": "#F3D2CC"},
-                ],
+                "steps": steps,
             },
         )
     ).update_layout(
@@ -301,7 +312,9 @@ def detail_panels():
     with left:
         with st.container(border=True):
             card_title("Motor — RPM")
-            st.plotly_chart(gauge(rpm, ENGINE_RPM_MAX, "rpm"), width="stretch")
+            st.plotly_chart(
+                gauge(rpm, ENGINE_RPM_MAX, "rpm", steps=RPM_STEPS), width="stretch"
+            )
             st.caption("RPM vs Tiempo (últimos 10 min)")
             rpm_df = time_series("engine_speed")
             if rpm_df.empty:
