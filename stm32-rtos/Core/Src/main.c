@@ -13,19 +13,31 @@
 #include "motor.h"
 #include "pwm.h"
 #include "uart.h"
-#include "user_uart.h"
 
-volatile uint8_t brake_active = 0;
-volatile double duty = 0;
-volatile uint16_t adc_value = 0;
+typedef struct {
+  uint16_t adc_value;
+} SensorData_t;
+
+typedef struct {
+  double vehicle_speed;
+  double engine_speed;
+  double gear;
+} ModelOutput_t;
+
+#define EVT_BRAKE (1 << 0)
+
+static SensorData_t sensor_data = {0};
+static ModelOutput_t model_output = {0};
+static SemaphoreHandle_t hSensorMutex;
+static SemaphoreHandle_t hModelMutex;
+static EventGroupHandle_t hEvents;
 
 void TASK_Sensor(void *pvParameters);
-void TASK_Controller(void *pvParameters);
-void TASK_Motor(void *pvParameters);
+void TASK_ControlMotor(void *pvParameters);
 void TASK_Display(void *pvParameters);
 void TASK_Comm(void *pvParameters);
 
-TaskHandle_t hSensor, hController, hMotor, hDisplay, hComm;
+TaskHandle_t hSensor, hControlMotor, hDisplay, hComm;
 
 void USER_SystemClock_Config(void);
 
@@ -35,16 +47,18 @@ int main(void) {
   USER_SystemClock_Config();
 
   /*
-   *  T1 TASK_Sensor:     priority 5, 20 ms
-   *  T2 TASK_Controller: priority 4, 40 ms
-   *  T3 TASK_Motor:      priority 3, 40 ms
-   *  T4 TASK_Comm:       priority 2, 100 ms
-   *  T5 TASK_Display:    priority 1, 500 ms                               */
-  xTaskCreate(TASK_Sensor, "Sensor", 256, NULL, 5, &hSensor);
-  xTaskCreate(TASK_Controller, "Controller", 256, NULL, 4, &hController);
-  xTaskCreate(TASK_Motor, "Motor", 256, NULL, 3, &hMotor);
-  xTaskCreate(TASK_Comm, "Comm", 256, NULL, 2, &hComm);
-  xTaskCreate(TASK_Display, "Display", 512, NULL, 1, &hDisplay);
+   *  T1 TASK_Sensor:      priority 4, 20 ms
+   *  T2 TASK_ControlMotor: priority 3, 40 ms
+   *  T3 TASK_Comm:        priority 2, 100 ms
+   *  T4 TASK_Display:     priority 1, 500 ms                               */
+  hSensorMutex = xSemaphoreCreateMutex();
+  hModelMutex  = xSemaphoreCreateMutex();
+  hEvents      = xEventGroupCreate();
+
+  xTaskCreate(TASK_Sensor,      "Sensor",       256, NULL, 4, &hSensor);
+  xTaskCreate(TASK_ControlMotor,"ControlMotor", 256, NULL, 3, &hControlMotor);
+  xTaskCreate(TASK_Comm,        "Comm",         256, NULL, 2, &hComm);
+  xTaskCreate(TASK_Display,     "Display",      512, NULL, 1, &hDisplay);
 
   vTaskStartScheduler();
 
@@ -77,34 +91,29 @@ void TASK_Sensor(void *pvParameters) {
   for (;;) {
     if (EXT_BUTTON) {
       vTaskDelay(10);
-      brake_active = EXT_BUTTON ? 1 : 0;
+      if (EXT_BUTTON){
+        xEventGroupSetBits(hEvents, EVT_BRAKE);
+      } else {
+        xEventGroupClearBits(hEvents, EVT_BRAKE);
+      }
     } else {
-      brake_active = 0;
+      xEventGroupClearBits(hEvents, EVT_BRAKE);
     }
 
     ADC1->CR2 |= (0x1UL << 22U);
     while (!(ADC1->SR & (0x1UL << 1U)))
-      ;
-    adc_value = ADC1->DR & 0xFFFF;
+    ;
+    
+    xSemaphoreTake(hSensorMutex, portMAX_DELAY);
+    sensor_data.adc_value = ADC1->DR & 0xFFFF;
+    xSemaphoreGive(hSensorMutex);
 
     vTaskDelayUntil(&xLastWakeTime, 20);
   }
 }
 
-void TASK_Controller(void *pvParameters) {
+void TASK_ControlMotor(void *pvParameters) {
   EngTrModel_initialize();
-
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  for (;;) {
-    EngTrModel_U.Throttle = 1.5f + ((float)adc_value / 4095.0f) * 98.5f;
-    EngTrModel_U.BrakeTorque = brake_active ? 100.0 : 0.0;
-    EngTrModel_step();
-
-    vTaskDelayUntil(&xLastWakeTime, 40);
-  }
-}
-
-void TASK_Motor(void *pvParameters) {
   PWM_GPIO_Init();
   TIM2_PWM_Init();
   TIM4_PWM_Init();
@@ -113,11 +122,27 @@ void TASK_Motor(void *pvParameters) {
 
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
-    duty = (EngTrModel_Y.VehicleSpeed / 140.0) * 100.0;
-    Change_Duty_Cycle_M1((uint8_t)duty);
-    Change_Duty_Cycle_M2((uint8_t)duty);
-    Change_Duty_Cycle_M3((uint8_t)duty);
-    Change_Duty_Cycle_M4((uint8_t)duty);
+    uint16_t adc;
+    xSemaphoreTake(hSensorMutex, portMAX_DELAY);
+    adc = sensor_data.adc_value;
+    xSemaphoreGive(hSensorMutex);
+
+    EventBits_t bits = xEventGroupGetBits(hEvents);
+    EngTrModel_U.Throttle    = 1.5f + ((float)adc / 4095.0f) * 98.5f;
+    EngTrModel_U.BrakeTorque = (bits & EVT_BRAKE) ? 100.0 : 0.0;
+    EngTrModel_step();
+
+    xSemaphoreTake(hModelMutex, portMAX_DELAY);
+    model_output.vehicle_speed = EngTrModel_Y.VehicleSpeed;
+    model_output.engine_speed  = EngTrModel_Y.EngineSpeed;
+    model_output.gear          = EngTrModel_Y.Gear;
+    xSemaphoreGive(hModelMutex);
+
+    uint8_t duty = (uint8_t)((EngTrModel_Y.VehicleSpeed / 140.0) * 100.0);
+    Change_Duty_Cycle_M1(duty);
+    Change_Duty_Cycle_M2(duty);
+    Change_Duty_Cycle_M3(duty);
+    Change_Duty_Cycle_M4(duty);
 
     vTaskDelayUntil(&xLastWakeTime, 40);
   }
@@ -128,18 +153,23 @@ void TASK_Comm(void *pvParameters) {
 
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
+    ModelOutput_t out;
+    xSemaphoreTake(hModelMutex, portMAX_DELAY);
+    out = model_output;
+    xSemaphoreGive(hModelMutex);
+
     char buffer[32];
     uint16_t len;
 
     len = snprintf(buffer, sizeof(buffer), "VS:%.2f\r\n",
-                   EngTrModel_Y.VehicleSpeed);
+                   out.vehicle_speed);
     USART1_Transmit((uint8_t *)buffer, len);
 
     len = snprintf(buffer, sizeof(buffer), "ES:%.2f\r\n",
-                   EngTrModel_Y.EngineSpeed);
+                   out.engine_speed);
     USART1_Transmit((uint8_t *)buffer, len);
 
-    len = snprintf(buffer, sizeof(buffer), "GR:%.2f\r\n", EngTrModel_Y.Gear);
+    len = snprintf(buffer, sizeof(buffer), "GR:%.2f\r\n", out.gear);
     USART1_Transmit((uint8_t *)buffer, len);
 
     vTaskDelayUntil(&xLastWakeTime, 100);
@@ -152,14 +182,26 @@ void TASK_Display(void *pvParameters) {
 
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
-    char line[17];
+    SensorData_t  sens;
+    ModelOutput_t out;
+    EventBits_t   bits = xEventGroupGetBits(hEvents);
 
-    snprintf(line, sizeof(line), "Duty:%4.0f%% G:%-3u", (double)duty,
-             (unsigned)EngTrModel_Y.Gear);
+    xSemaphoreTake(hSensorMutex, portMAX_DELAY);
+    sens = sensor_data;
+    xSemaphoreGive(hSensorMutex);
+
+    xSemaphoreTake(hModelMutex, portMAX_DELAY);
+    out = model_output;
+    xSemaphoreGive(hModelMutex);
+
+    char line[17];
+    snprintf(line, sizeof(line), "Duty:%4.0f%% G:%-3u", (double)sens.adc_value,
+             (unsigned)out.gear);
     LCD_Set_Cursor(1, 1);
     LCD_Put_Str(line);
 
-    snprintf(line, sizeof(line), "RPM:%10.1f  ", EngTrModel_Y.EngineSpeed);
+    snprintf(line, sizeof(line), "RPM:%7.1f B:%u  ", out.engine_speed,
+             (unsigned)!!(bits & EVT_BRAKE));
     LCD_Set_Cursor(2, 1);
     LCD_Put_Str(line);
 
