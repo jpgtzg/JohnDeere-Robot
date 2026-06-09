@@ -15,7 +15,7 @@ _control_mode = "local"
 
 
 def _publish(topic: str, payload: str):
-    publish.single(topic, payload=payload, hostname=BROKER)
+    publish.single(topic, payload=payload, hostname=BROKER, qos=1, retain=True)
     print(f"Published [{topic}]: {payload}")
 
 
