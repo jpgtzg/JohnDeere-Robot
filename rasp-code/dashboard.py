@@ -323,7 +323,7 @@ def detail_panels():
                 st.info("Sin datos de velocidad en la ventana.")
             else:
                 st.plotly_chart(
-                    line_fig(spd_df, "vehicle_speed", JD_GREEN, area=True, y_title="km/h"),
+                    line_fig(spd_df, "vehicle_speed", JD_GREEN, y_title="km/h"),
                     width="stretch",
                 )
 
