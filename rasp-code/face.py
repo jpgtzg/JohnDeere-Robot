@@ -1,12 +1,84 @@
 import math
 import os
+import threading
+import time
 import zipfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import cv2
 import numpy as np
 from ai_edge_litert.interpreter import Interpreter
 
 from influx import write_to_influxdb
+
+# ── MJPEG video streaming ─────────────────────────────────────────────────────
+# face.py owns the single camera, so it (re)publishes each annotated frame as an
+# MJPEG stream that the Streamlit dashboard embeds for the driver-status view.
+_latest_jpeg: "bytes | None" = None
+_jpeg_lock = threading.Lock()
+
+
+def _publish_frame(frame):
+    """Encode the (annotated) frame as JPEG for the MJPEG stream."""
+    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+    if ok:
+        global _latest_jpeg
+        with _jpeg_lock:
+            _latest_jpeg = buf.tobytes()
+
+
+class _StreamHandler(BaseHTTPRequestHandler):
+    def log_message(self, *args):  # silence per-request console logging
+        pass
+
+    def do_GET(self):
+        if self.path.split("?")[0] not in ("/stream", "/"):
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-cache, private")
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+        self.end_headers()
+        try:
+            while True:
+                with _jpeg_lock:
+                    frame = _latest_jpeg
+                if frame is not None:
+                    self.wfile.write(b"--frame\r\n")
+                    self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                    self.wfile.write(f"Content-Length: {len(frame)}\r\n\r\n".encode())
+                    self.wfile.write(frame)
+                    self.wfile.write(b"\r\n")
+                time.sleep(0.04)  # ~25 fps cap
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # client (dashboard tab) went away
+
+
+def start_stream_server(port: int):
+    server = ThreadingHTTPServer(("0.0.0.0", port), _StreamHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    print(f"MJPEG stream available at http://0.0.0.0:{port}/stream")
+
+
+def open_camera():
+    """Open the first camera index that actually delivers frames.
+
+    On the Pi /dev/video0 is often a non-capture node, so we probe a few
+    indices. Override with CAMERA_INDEX=<n> to force a specific device.
+    """
+    forced = os.environ.get("CAMERA_INDEX")
+    indices = [int(forced)] if forced is not None else [0, 1, 2, 3]
+    for idx in indices:
+        cap = cv2.VideoCapture(idx)
+        if cap.isOpened():
+            ok, _ = cap.read()
+            if ok:
+                print(f"Camera opened at index {idx}")
+                return cap
+            cap.release()
+        print(f"Camera index {idx} not usable")
+    return None
 
 # ── model setup ───────────────────────────────────────────────────────────────
 TASK_PATH = "face_landmarker.task"
@@ -266,9 +338,13 @@ def main():
 
     headless = not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Cannot open webcam")
+    stream_enabled = os.environ.get("STREAM_ENABLED", "1") != "0"
+    if stream_enabled:
+        start_stream_server(int(os.environ.get("STREAM_PORT", "8080")))
+
+    cap = open_camera()
+    if cap is None:
+        print("Cannot open webcam — no usable camera index found")
         return
 
     while True:
@@ -292,37 +368,28 @@ def main():
                     "driver_metrics", "looking", int(looking), "Raspberry_Pi"
                 )
 
-            if not headless:
-                eye_color = (0, 255, 0) if looking else (0, 0, 255)
-                draw_eye(frame, lm, LEFT_EYE, eye_color)
-                draw_eye(frame, lm, RIGHT_EYE, eye_color)
-                draw_iris(frame, lm, LEFT_IRIS, (255, 255, 0))
-                draw_iris(frame, lm, RIGHT_IRIS, (255, 255, 0))
+            # Annotate the frame — used by both the MJPEG stream and the window.
+            eye_color = (0, 255, 0) if looking else (0, 0, 255)
+            draw_eye(frame, lm, LEFT_EYE, eye_color)
+            draw_eye(frame, lm, RIGHT_EYE, eye_color)
+            draw_iris(frame, lm, LEFT_IRIS, (255, 255, 0))
+            draw_iris(frame, lm, RIGHT_IRIS, (255, 255, 0))
 
-                label = "Looking at camera" if looking else "Not looking"
-                gaze_dbg = f"iris  L h:{lh:.2f} v:{lv:.2f}  R h:{rh:.2f} v:{rv:.2f}"
-                pose_dbg = f"head  yaw:{yaw:+.1f}  pitch:{pitch:+.1f}"
-                cv2.putText(
-                    frame, label, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, eye_color, 2
-                )
-                cv2.putText(
-                    frame,
-                    gaze_dbg,
-                    (20, 75),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (200, 200, 200),
-                    1,
-                )
-                cv2.putText(
-                    frame,
-                    pose_dbg,
-                    (20, 95),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (200, 200, 200),
-                    1,
-                )
+            label = "Looking at camera" if looking else "Not looking"
+            gaze_dbg = f"iris  L h:{lh:.2f} v:{lv:.2f}  R h:{rh:.2f} v:{rv:.2f}"
+            pose_dbg = f"head  yaw:{yaw:+.1f}  pitch:{pitch:+.1f}"
+            cv2.putText(
+                frame, label, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, eye_color, 2
+            )
+            cv2.putText(
+                frame, gaze_dbg, (20, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1
+            )
+            cv2.putText(
+                frame, pose_dbg, (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1
+            )
+
+        if stream_enabled:
+            _publish_frame(frame)
 
         if not headless:
             cv2.imshow("Gaze Detection", frame)

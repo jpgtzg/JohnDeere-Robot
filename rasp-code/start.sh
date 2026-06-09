@@ -3,26 +3,29 @@
 set -e
 
 usage() {
-    echo "Usage: $0 [--face] [--main] [--api] [--all]"
-    echo "  --face   Run face.py (gaze detection → InfluxDB)"
-    echo "  --main   Run main.py (MQTT → InfluxDB bridge)"
-    echo "  --api    Run api.py  (REST API for remote control)"
-    echo "  --all    Run all three concurrently"
+    echo "Usage: $0 [--face] [--main] [--api] [--dashboard] [--all]"
+    echo "  --face       Run face.py (gaze detection → InfluxDB)"
+    echo "  --main       Run main.py (MQTT → InfluxDB bridge)"
+    echo "  --api        Run api.py  (REST API for remote control)"
+    echo "  --dashboard  Run dashboard.py (Streamlit telemetry UI)"
+    echo "  --all        Run all four concurrently"
     exit 1
 }
 
 RUN_FACE=false
 RUN_MAIN=false
 RUN_API=false
+RUN_DASHBOARD=false
 
 [[ $# -eq 0 ]] && usage
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --face) RUN_FACE=true ;;
-        --main) RUN_MAIN=true ;;
-        --api)  RUN_API=true ;;
-        --all)  RUN_FACE=true; RUN_MAIN=true; RUN_API=true ;;
+        --face)      RUN_FACE=true ;;
+        --main)      RUN_MAIN=true ;;
+        --api)       RUN_API=true ;;
+        --dashboard) RUN_DASHBOARD=true ;;
+        --all)       RUN_FACE=true; RUN_MAIN=true; RUN_API=true; RUN_DASHBOARD=true ;;
         *) echo "Unknown flag: $1"; usage ;;
     esac
     shift
@@ -73,6 +76,11 @@ fi
 
 if "$RUN_API"; then
     uv run api.py &
+    PIDS+=($!)
+fi
+
+if "$RUN_DASHBOARD"; then
+    uv run streamlit run dashboard.py --server.address 0.0.0.0 --server.port 8501 &
     PIDS+=($!)
 fi
 
