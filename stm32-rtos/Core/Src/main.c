@@ -142,10 +142,10 @@ void TASK_ControlMotor(void *pvParameters) {
     EventBits_t bits = xEventGroupGetBits(hEvents);
     if (bits & EVT_REMOTE_MODE) {
       EngTrModel_U.Throttle    = sens.remote_throttle;
-      EngTrModel_U.BrakeTorque = (bits & EVT_REMOTE_BRAKE) ? 100.0 : 0.0;
+      EngTrModel_U.BrakeTorque = (bits & EVT_REMOTE_BRAKE) ? 150.0 : 0.0;
     } else {
       EngTrModel_U.Throttle    = 1.5f + ((float)sens.adc_value / 4095.0f) * 98.5f;
-      EngTrModel_U.BrakeTorque = (bits & EVT_BRAKE) ? 100.0 : 0.0;
+      EngTrModel_U.BrakeTorque = (bits & EVT_BRAKE) ? 150.0 : 0.0;
     }
     EngTrModel_step();
 
