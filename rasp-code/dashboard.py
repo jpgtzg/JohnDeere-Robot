@@ -35,7 +35,7 @@ TIMESERIES_WINDOW = "-10m"
 LATEST_WINDOW = "-5m"
 
 CAMERA_STREAM_PORT = 8080  # must match STREAM_PORT used by face.py
-CAMERA_HEIGHT = 360
+CAMERA_HEIGHT = 340
 
 # John Deere brand palette
 JD_GREEN = "#367C2B"
@@ -45,6 +45,23 @@ JD_RED = "#C0392B"
 JD_GREY = "#6B6B6B"
 
 st.set_page_config(page_title="John Deere — Tractor Telemetry", layout="wide")
+
+st.markdown(
+    """
+    <style>
+      #MainMenu, footer {visibility: hidden;}
+      .block-container {padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1500px;}
+      div[data-testid="stMetric"] {
+        background: #FFFFFF; border: 1px solid #E3E8E3; border-radius: 12px;
+        padding: 12px 16px;
+      }
+      div[data-testid="stVerticalBlockBorderWrapper"] {
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # ── influx access ─────────────────────────────────────────────────────────────
@@ -112,23 +129,36 @@ def set_control_mode(mode: str):
 
 
 # ── ui helpers ────────────────────────────────────────────────────────────────
-def badge(text: str, color: str):
+def card_title(text: str):
     st.markdown(
-        f"<div style='background:{color};color:#fff;padding:16px;border-radius:8px;"
-        f"text-align:center;font-size:22px;font-weight:700;letter-spacing:1px'>"
-        f"{text}</div>",
+        f"<div style='font-weight:700;font-size:15px;color:{JD_GREEN_DARK};"
+        f"margin-bottom:6px'>{text}</div>",
         unsafe_allow_html=True,
     )
 
 
-def gauge(value, title, max_value, suffix, bar_color=JD_GREEN):
+def kpi_card(label: str, value: str, accent: str = JD_GREEN):
+    st.markdown(
+        f"""
+        <div style="background:#fff;border:1px solid #E3E8E3;border-left:6px solid {accent};
+                    border-radius:12px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="font-size:12px;color:{JD_GREY};font-weight:700;
+                      text-transform:uppercase;letter-spacing:.6px">{label}</div>
+          <div style="font-size:30px;color:#1A1A1A;font-weight:800;line-height:1.2;
+                      margin-top:4px">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def gauge(value, max_value, suffix, bar_color=JD_GREEN):
     val = value if value is not None else 0
     return go.Figure(
         go.Indicator(
             mode="gauge+number",
             value=val,
-            number={"suffix": f" {suffix}"},
-            title={"text": title},
+            number={"suffix": f" {suffix}", "font": {"size": 26}},
             gauge={
                 "axis": {"range": [0, max_value]},
                 "bar": {"color": bar_color},
@@ -139,16 +169,45 @@ def gauge(value, title, max_value, suffix, bar_color=JD_GREEN):
                 ],
             },
         )
-    ).update_layout(height=280, margin=dict(l=20, r=20, t=50, b=10))
+    ).update_layout(
+        height=220,
+        margin=dict(l=20, r=20, t=10, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+
+
+def line_fig(df, field, color, area=False):
+    fig = go.Figure(
+        go.Scatter(
+            x=df["time"],
+            y=df[field],
+            mode="lines",
+            line=dict(color=color, width=2),
+            fill="tozeroy" if area else None,
+            fillcolor="rgba(54,124,43,0.13)" if area else None,
+        )
+    )
+    fig.update_layout(
+        height=220,
+        margin=dict(l=8, r=8, t=8, b=8),
+        xaxis_title=None,
+        yaxis_title=None,
+        plot_bgcolor="#FFFFFF",
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(showgrid=False),
+        yaxis=dict(gridcolor="#EEF2EE"),
+    )
+    return fig
 
 
 # ── driver camera (persistent MJPEG embed) ────────────────────────────────────
 def render_camera():
     """Embed the MJPEG stream from face.py.
 
-    The img src is built from the browser's own hostname so it works no matter
-    which IP/host is used to reach the dashboard. Rendered once (outside the
-    auto-refreshing fragments) so the video connection is never torn down.
+    The img src is built from the parent frame's hostname (components.html runs
+    in an srcdoc iframe whose own hostname is empty) so it works for any host.
+    Rendered once, outside the auto-refreshing fragments, so the video
+    connection is never torn down.
     """
     components.html(
         f"""
@@ -162,8 +221,6 @@ def render_camera():
         </div>
         <script>
           (function() {{
-            // Inside components.html the iframe is srcdoc, so its own
-            // location.hostname is empty — read the real host from the parent.
             let host = '';
             try {{ host = window.parent.location.hostname; }} catch (e) {{}}
             if (!host) host = window.location.hostname;
@@ -178,114 +235,119 @@ def render_camera():
 
 # ── live fragments (re-poll every REFRESH_SECONDS without a full rerun) ────────
 @st.fragment(run_every=REFRESH_SECONDS)
+def kpi_strip():
+    rpm = latest_value("engine_speed")
+    spd = latest_value("vehicle_speed")
+    gear = latest_value("gear")
+    mode = get_control_mode()
+    looking = latest_value("looking", DRIVER_MEASUREMENT)
+
+    cols = st.columns(5)
+    with cols[0]:
+        kpi_card("Engine RPM", f"{int(rpm)}" if rpm is not None else "—")
+    with cols[1]:
+        kpi_card("Velocidad", f"{spd:.0f} km/h" if spd is not None else "—")
+    with cols[2]:
+        kpi_card("Gear", f"{int(gear)}" if gear is not None else "—")
+    with cols[3]:
+        kpi_card("Modo", (mode or "—").upper(), JD_GREEN_DARK)
+    with cols[4]:
+        if looking is None:
+            kpi_card("Conductor", "SIN DATOS", JD_GREY)
+        elif int(looking) == 1:
+            kpi_card("Conductor", "ATENTO", JD_GREEN)
+        else:
+            kpi_card("Conductor", "DISTRAÍDO", JD_RED)
+
+
+@st.fragment(run_every=REFRESH_SECONDS)
 def driver_status_panel():
     looking = latest_value("looking", DRIVER_MEASUREMENT)
-    st.markdown("**Estado del conductor**")
     if looking is None:
-        badge("SIN DATOS", JD_GREY)
+        color, text = JD_GREY, "SIN DATOS"
     elif int(looking) == 1:
-        badge("ATENTO", JD_GREEN)
+        color, text = JD_GREEN, "ATENTO"
     else:
-        badge("DISTRAIDO", JD_RED)
+        color, text = JD_RED, "DISTRAÍDO"
+    st.markdown(
+        f"<div style='background:{color};color:#fff;padding:18px;border-radius:10px;"
+        f"text-align:center;font-size:22px;font-weight:800;letter-spacing:1px'>{text}</div>",
+        unsafe_allow_html=True,
+    )
     st.caption(f"Actualizado: {datetime.now(timezone.utc).astimezone():%H:%M:%S}")
 
 
 @st.fragment(run_every=REFRESH_SECONDS)
-def live_metrics():
-    engine_rpm = latest_value("engine_speed")
-    vehicle_speed = latest_value("vehicle_speed")
-    gear = latest_value("gear")
-    mode = get_control_mode()
+def detail_panels():
+    rpm = latest_value("engine_speed")
+    spd = latest_value("vehicle_speed")
+    left, right = st.columns(2)
 
-    # top row: engine gauge | gear | control mode
-    c1, c2, c3 = st.columns([2, 1, 1])
-    with c1:
-        st.plotly_chart(
-            gauge(engine_rpm, "Engine RPM", ENGINE_RPM_MAX, "rpm"),
-            width="stretch",
-        )
-    with c2:
-        st.metric("Gear", f"{int(gear)}" if gear is not None else "-")
-    with c3:
-        st.metric("Control Mode", (mode or "-").upper())
+    with left:
+        with st.container(border=True):
+            card_title("Motor — RPM")
+            st.plotly_chart(gauge(rpm, ENGINE_RPM_MAX, "rpm"), width="stretch")
+            rpm_df = time_series("engine_speed")
+            if rpm_df.empty:
+                st.info("Sin datos de RPM en la ventana.")
+            else:
+                st.plotly_chart(line_fig(rpm_df, "engine_speed", JD_GREEN), width="stretch")
 
-    # vehicle speed gauge + time series
-    g1, g2 = st.columns([1, 3])
-    with g1:
-        st.plotly_chart(
-            gauge(vehicle_speed, "Vehicle Speed", VEHICLE_SPEED_MAX, "km/h", JD_GREEN_DARK),
-            width="stretch",
-        )
-    with g2:
-        st.subheader("Vehicle Speed - last 10 min")
-        speed_df = time_series("vehicle_speed")
-        if speed_df.empty:
-            st.info("No vehicle speed data in the selected window.")
-        else:
-            fig = go.Figure(
-                go.Scatter(
-                    x=speed_df["time"],
-                    y=speed_df["vehicle_speed"],
-                    mode="lines",
-                    line=dict(color=JD_GREEN, width=2),
-                    fill="tozeroy",
-                    fillcolor="rgba(54,124,43,0.15)",
+    with right:
+        with st.container(border=True):
+            card_title("Velocidad del vehículo")
+            st.plotly_chart(
+                gauge(spd, VEHICLE_SPEED_MAX, "km/h", JD_GREEN_DARK), width="stretch"
+            )
+            spd_df = time_series("vehicle_speed")
+            if spd_df.empty:
+                st.info("Sin datos de velocidad en la ventana.")
+            else:
+                st.plotly_chart(
+                    line_fig(spd_df, "vehicle_speed", JD_GREEN, area=True), width="stretch"
                 )
-            )
-            fig.update_layout(
-                height=300,
-                margin=dict(l=10, r=10, t=10, b=10),
-                xaxis_title="Time",
-                yaxis_title="km/h",
-            )
-            st.plotly_chart(fig, width="stretch")
-
-    # engine rpm trend
-    st.subheader("Engine RPM - last 10 min")
-    rpm_df = time_series("engine_speed")
-    if rpm_df.empty:
-        st.info("No engine RPM data in the selected window.")
-    else:
-        fig = go.Figure(
-            go.Scatter(
-                x=rpm_df["time"],
-                y=rpm_df["engine_speed"],
-                mode="lines",
-                line=dict(color=JD_GREEN, width=2),
-            )
-        )
-        fig.update_layout(
-            height=260,
-            margin=dict(l=10, r=10, t=10, b=10),
-            xaxis_title="Time",
-            yaxis_title="rpm",
-        )
-        st.plotly_chart(fig, width="stretch")
 
     if err := st.session_state.get("influx_error"):
         st.caption(f"InfluxDB: {err}")
 
 
-# ── sidebar: control mode (full rerun on interaction) ─────────────────────────
+# ── sidebar: control mode (immediate-apply, no stale button) ──────────────────
+def _apply_mode():
+    ok, payload = set_control_mode(st.session_state.mode_select)
+    st.session_state["mode_result"] = (ok, payload)
+
+
 with st.sidebar:
     st.header("Control")
-    current_mode = get_control_mode()
-    if current_mode is None:
-        st.error("API not reachable (port 5000)")
-    else:
-        st.success(f"Mode: **{current_mode.upper()}**")
 
-    new_mode = st.radio(
-        "Set control mode",
+    live_mode = get_control_mode()
+    if live_mode is None:
+        st.error("API no disponible (puerto 5000)")
+    else:
+        st.markdown(
+            f"<div style='background:{JD_GREEN};color:#fff;padding:10px 14px;"
+            f"border-radius:8px;font-weight:700;text-align:center'>"
+            f"MODO ACTUAL: {live_mode.upper()}</div>",
+            unsafe_allow_html=True,
+        )
+
+    if "mode_select" not in st.session_state:
+        st.session_state.mode_select = live_mode or "local"
+
+    st.radio(
+        "Cambiar modo de control",
         options=["local", "remote"],
-        index=0 if (current_mode or "local") == "local" else 1,
+        key="mode_select",
+        on_change=_apply_mode,
     )
-    if st.button("Change mode", width="stretch"):
-        ok, payload = set_control_mode(new_mode)
+
+    res = st.session_state.get("mode_result")
+    if res is not None:
+        ok, payload = res
         if ok:
-            st.success(f"Mode set to {payload.get('mode', new_mode).upper()}")
+            st.success(f"Modo aplicado: {payload.get('mode', '').upper()}")
         else:
-            st.error(payload.get("error", "Failed to set mode"))
+            st.error(payload.get("error", "No se pudo cambiar el modo"))
 
     st.divider()
     st.caption(f"Auto-refresh cada {REFRESH_SECONDS}s")
@@ -294,10 +356,11 @@ with st.sidebar:
 # ── branded header ────────────────────────────────────────────────────────────
 st.markdown(
     f"""
-    <div style="background:{JD_GREEN};padding:16px 24px;border-radius:10px;
-                display:flex;align-items:center;gap:18px;margin-bottom:14px">
+    <div style="background:{JD_GREEN};padding:16px 26px;border-radius:12px;
+                display:flex;align-items:center;gap:18px;margin-bottom:16px;
+                box-shadow:0 2px 6px rgba(0,0,0,.12)">
       <span style="font-family:'Arial Black',Arial,sans-serif;font-weight:900;
-                   font-size:32px;color:{JD_YELLOW};letter-spacing:1px">JOHN DEERE</span>
+                   font-size:34px;color:{JD_YELLOW};letter-spacing:1px">JOHN DEERE</span>
       <span style="color:#ffffff;font-size:20px;font-weight:600">
         Tractor Telemetry Dashboard</span>
     </div>
@@ -305,13 +368,21 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Driver monitoring: live camera (persistent) + live attention status
-st.subheader("Monitoreo del conductor")
-cam_col, status_col = st.columns([3, 1])
-with cam_col:
-    render_camera()  # rendered once — keeps the MJPEG connection alive
-with status_col:
-    driver_status_panel()
+# KPI strip
+kpi_strip()
+st.write("")
 
-st.divider()
-live_metrics()
+# Driver monitoring: live camera (persistent) + live attention status
+with st.container(border=True):
+    card_title("Monitoreo del conductor")
+    cam_col, status_col = st.columns([3, 1])
+    with cam_col:
+        render_camera()  # rendered once — keeps the MJPEG connection alive
+    with status_col:
+        st.markdown("**Estado**")
+        driver_status_panel()
+
+st.write("")
+
+# Detail gauges + time series
+detail_panels()
