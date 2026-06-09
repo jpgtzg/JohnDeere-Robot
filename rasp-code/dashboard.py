@@ -335,7 +335,19 @@ def _apply_mode():
     st.session_state["mode_result"] = (ok, payload)
 
 
-def _remote_feedback(ok, payload):
+def _send_accel():
+    st.session_state["accel_result"] = send_remote("acceleration", st.session_state.accel_val)
+
+
+def _send_brake():
+    st.session_state["brake_result"] = send_remote("brake", st.session_state.brake_val)
+
+
+def _show_remote_result(key: str):
+    res = st.session_state.get(key)
+    if res is None:
+        return
+    ok, payload = res
     msg = payload.get("command", payload.get("error", "")) if isinstance(payload, dict) else ""
     (st.success if ok else st.error)(msg)
 
@@ -383,19 +395,17 @@ def control_panel():
 
             a_col, b_col = st.columns(2)
             with a_col:
-                accel = st.slider(
-                    "Aceleración (%)", 0, 100, 0, disabled=not remote_on, key="accel_val"
+                st.slider(
+                    "Aceleración (%)", 0, 100, 0, disabled=not remote_on,
+                    key="accel_val", on_change=_send_accel,
                 )
-                if st.button(
-                    "Enviar aceleración", disabled=not remote_on, width="stretch"
-                ):
-                    _remote_feedback(*send_remote("acceleration", accel))
+                _show_remote_result("accel_result")
             with b_col:
-                brake = st.slider(
-                    "Freno (%)", 0, 100, 0, disabled=not remote_on, key="brake_val"
+                st.slider(
+                    "Freno (%)", 0, 100, 0, disabled=not remote_on,
+                    key="brake_val", on_change=_send_brake,
                 )
-                if st.button("Enviar freno", disabled=not remote_on, width="stretch"):
-                    _remote_feedback(*send_remote("brake", brake))
+                _show_remote_result("brake_result")
 
             if st.button(
                 "PARO — freno máx.",
