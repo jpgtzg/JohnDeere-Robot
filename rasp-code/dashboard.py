@@ -128,6 +128,17 @@ def set_control_mode(mode: str):
         return False, {"error": str(exc)}
 
 
+def send_remote(action: str, value: float):
+    """POST a remote command (action = 'acceleration' or 'brake')."""
+    try:
+        resp = requests.post(
+            f"{API_URL}/remote/{action}", json={"value": value}, timeout=2
+        )
+        return resp.ok, resp.json()
+    except requests.RequestException as exc:
+        return False, {"error": str(exc)}
+
+
 # ── ui helpers ────────────────────────────────────────────────────────────────
 def card_title(text: str):
     st.markdown(
@@ -176,7 +187,7 @@ def gauge(value, max_value, suffix, bar_color=JD_GREEN):
     )
 
 
-def line_fig(df, field, color, area=False):
+def line_fig(df, field, color, area=False, y_title=None):
     fig = go.Figure(
         go.Scatter(
             x=df["time"],
@@ -188,10 +199,10 @@ def line_fig(df, field, color, area=False):
         )
     )
     fig.update_layout(
-        height=220,
+        height=240,
         margin=dict(l=8, r=8, t=8, b=8),
-        xaxis_title=None,
-        yaxis_title=None,
+        xaxis_title="Tiempo",
+        yaxis_title=y_title,
         plot_bgcolor="#FFFFFF",
         paper_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(showgrid=False),
@@ -287,11 +298,15 @@ def detail_panels():
         with st.container(border=True):
             card_title("Motor — RPM")
             st.plotly_chart(gauge(rpm, ENGINE_RPM_MAX, "rpm"), width="stretch")
+            st.caption("RPM vs Tiempo (últimos 10 min)")
             rpm_df = time_series("engine_speed")
             if rpm_df.empty:
                 st.info("Sin datos de RPM en la ventana.")
             else:
-                st.plotly_chart(line_fig(rpm_df, "engine_speed", JD_GREEN), width="stretch")
+                st.plotly_chart(
+                    line_fig(rpm_df, "engine_speed", JD_GREEN, y_title="rpm"),
+                    width="stretch",
+                )
 
     with right:
         with st.container(border=True):
@@ -299,12 +314,14 @@ def detail_panels():
             st.plotly_chart(
                 gauge(spd, VEHICLE_SPEED_MAX, "km/h", JD_GREEN_DARK), width="stretch"
             )
+            st.caption("Velocidad vs Tiempo (últimos 10 min)")
             spd_df = time_series("vehicle_speed")
             if spd_df.empty:
                 st.info("Sin datos de velocidad en la ventana.")
             else:
                 st.plotly_chart(
-                    line_fig(spd_df, "vehicle_speed", JD_GREEN, area=True), width="stretch"
+                    line_fig(spd_df, "vehicle_speed", JD_GREEN, area=True, y_title="km/h"),
+                    width="stretch",
                 )
 
     if err := st.session_state.get("influx_error"):
@@ -348,6 +365,34 @@ with st.sidebar:
             st.success(f"Modo aplicado: {payload.get('mode', '').upper()}")
         else:
             st.error(payload.get("error", "No se pudo cambiar el modo"))
+
+    # ── remote driving controls (only active in REMOTE mode) ──────────────────
+    st.divider()
+    st.subheader("Control remoto")
+    remote_on = live_mode == "remote"
+    if not remote_on:
+        st.info("Disponible solo en modo REMOTE")
+
+    accel = st.slider(
+        "Aceleración (%)", 0, 100, 0, disabled=not remote_on, key="accel_val"
+    )
+    if st.button("Enviar aceleración", disabled=not remote_on, width="stretch"):
+        ok, payload = send_remote("acceleration", accel)
+        (st.success if ok else st.error)(
+            payload.get("command", payload.get("error", "")) if isinstance(payload, dict) else ""
+        )
+
+    brake = st.slider("Freno (%)", 0, 100, 0, disabled=not remote_on, key="brake_val")
+    if st.button("Enviar freno", disabled=not remote_on, width="stretch"):
+        ok, payload = send_remote("brake", brake)
+        (st.success if ok else st.error)(
+            payload.get("command", payload.get("error", "")) if isinstance(payload, dict) else ""
+        )
+
+    if st.button("PARO — freno máx.", type="primary", disabled=not remote_on, width="stretch"):
+        send_remote("acceleration", 0)
+        ok, payload = send_remote("brake", 100)
+        (st.success if ok else st.error)("Freno de emergencia enviado" if ok else "Error")
 
     st.divider()
     st.caption(f"Auto-refresh cada {REFRESH_SECONDS}s")
