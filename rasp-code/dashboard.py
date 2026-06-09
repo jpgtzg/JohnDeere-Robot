@@ -190,13 +190,14 @@ def gauge(value, max_value, suffix, bar_color=JD_GREEN):
     )
 
 
-def line_fig(df, field, color, area=False, y_title=None):
+def line_fig(df, field, color, area=False, y_title=None, markers=False):
     fig = go.Figure(
         go.Scatter(
             x=df["time"],
             y=df[field],
-            mode="lines",
+            mode="lines+markers" if markers else "lines",
             line=dict(color=color, width=2),
+            marker=dict(color=color, size=6) if markers else None,
             fill="tozeroy" if area else None,
             fillcolor="rgba(54,124,43,0.13)" if area else None,
         )
@@ -323,7 +324,7 @@ def detail_panels():
                 st.info("Sin datos de velocidad en la ventana.")
             else:
                 st.plotly_chart(
-                    line_fig(spd_df, "vehicle_speed", JD_GREEN, y_title="km/h"),
+                    line_fig(spd_df, "vehicle_speed", JD_GREEN, y_title="km/h", markers=True),
                     width="stretch",
                 )
 
