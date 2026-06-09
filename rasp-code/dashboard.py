@@ -187,7 +187,7 @@ def gauge(value, max_value, suffix, bar_color=JD_GREEN, steps=None):
         go.Indicator(
             mode="gauge+number",
             value=val,
-            number={"suffix": f" {suffix}", "font": {"size": 26}},
+            number={"suffix": f" {suffix}", "font": {"size": 26}, "valueformat": ".1f"},
             gauge={
                 "axis": {"range": [0, max_value]},
                 "bar": {"color": bar_color},
@@ -270,7 +270,7 @@ def kpi_strip():
 
     cols = st.columns(5)
     with cols[0]:
-        kpi_card("Engine RPM", f"{int(rpm)}" if rpm is not None else "—")
+        kpi_card("Engine RPM", f"{rpm:.1f}" if rpm is not None else "—")
     with cols[1]:
         kpi_card("Velocidad", f"{spd:.0f} km/h" if spd is not None else "—")
     with cols[2]:
