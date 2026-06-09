@@ -60,6 +60,26 @@ def start_stream_server(port: int):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"MJPEG stream available at http://0.0.0.0:{port}/stream")
 
+
+def open_camera():
+    """Open the first camera index that actually delivers frames.
+
+    On the Pi /dev/video0 is often a non-capture node, so we probe a few
+    indices. Override with CAMERA_INDEX=<n> to force a specific device.
+    """
+    forced = os.environ.get("CAMERA_INDEX")
+    indices = [int(forced)] if forced is not None else [0, 1, 2, 3]
+    for idx in indices:
+        cap = cv2.VideoCapture(idx)
+        if cap.isOpened():
+            ok, _ = cap.read()
+            if ok:
+                print(f"Camera opened at index {idx}")
+                return cap
+            cap.release()
+        print(f"Camera index {idx} not usable")
+    return None
+
 # ── model setup ───────────────────────────────────────────────────────────────
 TASK_PATH = "face_landmarker.task"
 _MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".models")
@@ -322,9 +342,9 @@ def main():
     if stream_enabled:
         start_stream_server(int(os.environ.get("STREAM_PORT", "8080")))
 
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Cannot open webcam")
+    cap = open_camera()
+    if cap is None:
+        print("Cannot open webcam — no usable camera index found")
         return
 
     while True:
