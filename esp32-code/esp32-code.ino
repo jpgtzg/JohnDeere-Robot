@@ -10,16 +10,23 @@ const char ssid[] = "";
 const char pass[] = "";
 
 // ── MQTT ───────────────────────────────────────────────────
-WiFiClient  wifiClient;
-MqttClient  mqttClient(wifiClient);
+WiFiClient wifiClient;
+MqttClient mqttClient(wifiClient);
 
-const char broker[]        = "10.66.126.53";
-const int  port            = 1883;
+const char broker[] = "10.24.227.53";
+const int  port     = 1883;
+
+// Upward topics (STM32 → Raspberry Pi)
 const char engine_topic[]  = "robot/engine_speed";
 const char vehicle_topic[] = "robot/vehicle_speed";
 const char gear_topic[]    = "robot/gear";
 
-const bool MQTT_ENABLED = false;
+// Downward topics (Raspberry Pi → STM32)
+const char cmd_topic[]  = "esp32/commands";
+const char mode_topic[] = "esp32/control_mode";
+
+// ── State ──────────────────────────────────────────────────
+String controlMode = "LOCAL";
 
 // ──────────────────────────────────────────────────────────
 
@@ -48,6 +55,39 @@ void connectWiFi() {
                 WiFi.localIP().toString().c_str(), WiFi.RSSI());
 }
 
+bool connectMQTT() {
+  Serial.printf("Connecting to MQTT broker %s...\n", broker);
+  if (!mqttClient.connect(broker, port)) {
+    Serial.printf("MQTT failed! Error: %d\n", mqttClient.connectError());
+    return false;
+  }
+  Serial.println("MQTT connected!");
+  mqttClient.subscribe(cmd_topic);
+  mqttClient.subscribe(mode_topic);
+  return true;
+}
+
+// ── Downward: MQTT → STM32 ─────────────────────────────────
+void onMqttMessage(int messageSize) {
+  String topic = mqttClient.messageTopic();
+  String payload = "";
+  while (mqttClient.available()) {
+    payload += (char)mqttClient.read();
+  }
+
+  if (topic == mode_topic) {
+    controlMode = payload;
+    STM32_SERIAL.printf("MD:%s\r\n", payload.c_str());
+    Serial.printf("Mode → %s\n", payload.c_str());
+  } else if (topic == cmd_topic) {
+    if (controlMode == "REMOTE") {
+      STM32_SERIAL.printf("%s\r\n", payload.c_str());
+      Serial.printf("CMD → STM32: %s\n", payload.c_str());
+    }
+  }
+}
+
+// ── Upward: STM32 → MQTT ───────────────────────────────────
 void publishValue(const char* topic, const char* value) {
   mqttClient.beginMessage(topic);
   mqttClient.print(value);
@@ -61,42 +101,37 @@ void parseLine(const String& line) {
   else if (line.startsWith("GR:")) publishValue(gear_topic,    line.substring(3).c_str());
 }
 
+// ──────────────────────────────────────────────────────────
+
 void setup() {
   Serial.begin(9600);
   STM32_SERIAL.begin(STM32_BAUD, SERIAL_8N1, 16, 17);
 
   connectWiFi();
-
-  if(MQTT_ENABLED){
-    Serial.printf("Connecting to MQTT broker %s...\n", broker);
-    if (!mqttClient.connect(broker, port)) {
-      Serial.printf("MQTT failed! Error: %d\n", mqttClient.connectError());
-      while (1);
-    }
-    Serial.println("MQTT connected!");
-  }
-  Serial.println("Connected, MQTT disabled");
+  mqttClient.onMessage(onMqttMessage);
+  connectMQTT();
 }
 
 void loop() {
-  // Auto-reconnect if dropped
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi lost — reconnecting...");
     connectWiFi();
+    connectMQTT();
   }
 
-  if(MQTT_ENABLED){
-    mqttClient.poll();
+  if (!mqttClient.connected()) {
+    Serial.println("MQTT lost — reconnecting...");
+    connectMQTT();
   }
+
+  mqttClient.poll();
 
   while (STM32_SERIAL.available()) {
     String line = STM32_SERIAL.readStringUntil('\n');
     line.trim();
     if (line.length() > 0) {
       Serial.println("STM32 → " + line);
-      if(MQTT_ENABLED){
-        parseLine(line);
-      }
+      parseLine(line);
     }
   }
 }
