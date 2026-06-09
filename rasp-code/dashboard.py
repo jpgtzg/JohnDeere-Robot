@@ -24,7 +24,11 @@ from influx import INFLUX_BUCKET, INFLUX_ORG, INFLUX_TOKEN, INFLUX_URL
 warnings.simplefilter("ignore", MissingPivotFunction)
 
 # ── config ────────────────────────────────────────────────────────────────────
-API_URL = "http://localhost:5000"
+import socket
+_HOSTNAME = socket.gethostname()
+_IPS = socket.gethostbyname_ex(_HOSTNAME)[2]
+API_HOST = _IPS[0] if _IPS else "localhost"
+API_URL = f"http://{API_HOST}:5000"
 MEASUREMENT = "tractor_metrics"
 DRIVER_MEASUREMENT = "driver_metrics"
 
