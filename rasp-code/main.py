@@ -9,8 +9,6 @@ TOPICS = [
     "robot/engine_speed",
     "robot/vehicle_speed",
     "robot/gear",
-    "esp32/commands",
-    "esp32/control_mode",
 ]
 
 TOPIC_MAP = {
