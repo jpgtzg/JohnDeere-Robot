@@ -162,7 +162,11 @@ def render_camera():
         </div>
         <script>
           (function() {{
-            const host = window.location.hostname;
+            // Inside components.html the iframe is srcdoc, so its own
+            // location.hostname is empty — read the real host from the parent.
+            let host = '';
+            try {{ host = window.parent.location.hostname; }} catch (e) {{}}
+            if (!host) host = window.location.hostname;
             const img = document.getElementById('drivercam');
             img.src = 'http://' + host + ':{CAMERA_STREAM_PORT}/stream?t=' + Date.now();
           }})();
