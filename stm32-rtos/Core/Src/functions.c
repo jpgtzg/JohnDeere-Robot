@@ -4,10 +4,10 @@
 void EXT_Button_Init(void) {
   RCC->APB2ENR |= (0x1UL << 4U);  // GPIOC clock enable
 
-  // PC0 as input with pull-down (CNF=10, MODE=00) — uses CRH per original code
-  GPIOC->CRH &= ~(0xFUL << 0U);
-  GPIOC->CRH |=  (0x8UL << 0U);
-  GPIOC->ODR |=  (0x1UL << 1U);   // pull-down via ODR
+  // PC0 as input with pull-down (CNF=10, MODE=00)
+  GPIOC->CRL &= ~(0xFUL << 0U);
+  GPIOC->CRL |=  (0x8UL << 0U);
+  GPIOC->ODR &= ~(0x1UL << 0U);   // pull-down via ODR (0 = pull-down)
 }
 
 void ADC1_GPIO_Init(void) {
