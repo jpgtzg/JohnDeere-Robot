@@ -2,10 +2,11 @@ import paho.mqtt.publish as publish
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+from main import BROKER
+
 app = Flask(__name__)
 CORS(app)
 
-BROKER = "localhost"
 COMMAND_TOPIC = "esp32/commands"
 MODE_TOPIC = "esp32/control_mode"
 

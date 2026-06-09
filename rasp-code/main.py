@@ -3,9 +3,15 @@ from paho.mqtt import client as mqtt_client
 from influx import write_to_influxdb
 
 CLIENT_NAME = "Raspberry_Pi"
-BROKER = "localhost"
+BROKER = "10.24.227.53"
 PORT = 1883
-TOPICS = ["robot/engine_speed", "robot/vehicle_speed", "robot/gear"]
+TOPICS = [
+    "robot/engine_speed",
+    "robot/vehicle_speed",
+    "robot/gear",
+    "esp32/commands",
+    "esp32/control_mode",
+]
 
 TOPIC_MAP = {
     "robot/engine_speed": ("tractor_metrics", "engine_speed"),
