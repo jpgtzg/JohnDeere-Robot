@@ -4,8 +4,12 @@
 #include "FreeRTOS.h"
 #include "FreeRTOSConfig.h"
 #include "task.h"
+#include "semphr.h"
+#include "event_groups.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "EngTrModel.h"
 #include "functions.h"
@@ -16,6 +20,7 @@
 
 typedef struct {
   uint16_t adc_value;
+  float    remote_throttle;
 } SensorData_t;
 
 typedef struct {
@@ -24,7 +29,9 @@ typedef struct {
   double gear;
 } ModelOutput_t;
 
-#define EVT_BRAKE (1 << 0)
+#define EVT_BRAKE         (1 << 0)
+#define EVT_REMOTE_MODE   (1 << 1)
+#define EVT_REMOTE_BRAKE  (1 << 2)
 
 static SensorData_t sensor_data = {0};
 static ModelOutput_t model_output = {0};
@@ -33,11 +40,12 @@ static SemaphoreHandle_t hModelMutex;
 static EventGroupHandle_t hEvents;
 
 void TASK_Sensor(void *pvParameters);
+void TASK_CommRx(void *pvParameters);
 void TASK_ControlMotor(void *pvParameters);
 void TASK_Display(void *pvParameters);
 void TASK_Comm(void *pvParameters);
 
-TaskHandle_t hSensor, hControlMotor, hDisplay, hComm;
+TaskHandle_t hSensor, hCommRx, hControlMotor, hDisplay, hComm;
 
 void USER_SystemClock_Config(void);
 
@@ -47,18 +55,22 @@ int main(void) {
   USER_SystemClock_Config();
 
   /*
-   *  T1 TASK_Sensor:      priority 4, 20 ms
-   *  T2 TASK_ControlMotor: priority 3, 40 ms
-   *  T3 TASK_Comm:        priority 2, 100 ms
-   *  T4 TASK_Display:     priority 1, 500 ms                               */
+   *  T1 TASK_Sensor:       priority 4, 20 ms
+   *  T2 TASK_CommRx:       priority 4,  5 ms (polls UART for incoming commands)
+   *  T3 TASK_ControlMotor: priority 3, 40 ms
+   *  T4 TASK_Comm:         priority 2, 100 ms
+   *  T5 TASK_Display:      priority 1, 500 ms                               */
   hSensorMutex = xSemaphoreCreateMutex();
   hModelMutex  = xSemaphoreCreateMutex();
   hEvents      = xEventGroupCreate();
 
-  xTaskCreate(TASK_Sensor,      "Sensor",       256, NULL, 4, &hSensor);
-  xTaskCreate(TASK_ControlMotor,"ControlMotor", 256, NULL, 3, &hControlMotor);
-  xTaskCreate(TASK_Comm,        "Comm",         256, NULL, 2, &hComm);
-  xTaskCreate(TASK_Display,     "Display",      512, NULL, 1, &hDisplay);
+  USART1_Init();
+
+  xTaskCreate(TASK_Sensor,       "Sensor",       256, NULL, 4, &hSensor);
+  xTaskCreate(TASK_CommRx,       "CommRx",       256, NULL, 4, &hCommRx);
+  xTaskCreate(TASK_ControlMotor, "ControlMotor", 256, NULL, 3, &hControlMotor);
+  xTaskCreate(TASK_Comm,         "Comm",         256, NULL, 2, &hComm);
+  xTaskCreate(TASK_Display,      "Display",      512, NULL, 1, &hDisplay);
 
   vTaskStartScheduler();
 
@@ -122,14 +134,19 @@ void TASK_ControlMotor(void *pvParameters) {
 
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
-    uint16_t adc;
+    SensorData_t sens;
     xSemaphoreTake(hSensorMutex, portMAX_DELAY);
-    adc = sensor_data.adc_value;
+    sens = sensor_data;
     xSemaphoreGive(hSensorMutex);
 
     EventBits_t bits = xEventGroupGetBits(hEvents);
-    EngTrModel_U.Throttle    = 1.5f + ((float)adc / 4095.0f) * 98.5f;
-    EngTrModel_U.BrakeTorque = (bits & EVT_BRAKE) ? 100.0 : 0.0;
+    if (bits & EVT_REMOTE_MODE) {
+      EngTrModel_U.Throttle    = sens.remote_throttle;
+      EngTrModel_U.BrakeTorque = (bits & EVT_REMOTE_BRAKE) ? 100.0 : 0.0;
+    } else {
+      EngTrModel_U.Throttle    = 1.5f + ((float)sens.adc_value / 4095.0f) * 98.5f;
+      EngTrModel_U.BrakeTorque = (bits & EVT_BRAKE) ? 100.0 : 0.0;
+    }
     EngTrModel_step();
 
     xSemaphoreTake(hModelMutex, portMAX_DELAY);
@@ -149,8 +166,6 @@ void TASK_ControlMotor(void *pvParameters) {
 }
 
 void TASK_Comm(void *pvParameters) {
-  USART1_Init();
-
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
     ModelOutput_t out;
@@ -173,6 +188,47 @@ void TASK_Comm(void *pvParameters) {
     USART1_Transmit((uint8_t *)buffer, len);
 
     vTaskDelayUntil(&xLastWakeTime, 100);
+  }
+}
+
+void TASK_CommRx(void *pvParameters) {
+  static char buf[32];
+  uint8_t idx = 0;
+
+  for (;;) {
+    while (USART1->SR & (0x1UL << 5U)) {
+      char c = (char)(USART1->DR & 0xFF);
+      if (c == '\n' || idx >= sizeof(buf) - 1) {
+        buf[idx] = '\0';
+        if (idx > 0 && buf[idx - 1] == '\r') buf[--idx] = '\0';
+
+        if (strncmp(buf, "MD:", 3) == 0) {
+          if (strncmp(buf + 3, "REMOTE", 6) == 0) {
+            xEventGroupSetBits(hEvents, EVT_REMOTE_MODE);
+            xEventGroupClearBits(hEvents, EVT_REMOTE_BRAKE);
+          } else {
+            xEventGroupClearBits(hEvents, EVT_REMOTE_MODE | EVT_REMOTE_BRAKE);
+          }
+        } else if (strncmp(buf, "AC:", 3) == 0) {
+          float val = atof(buf + 3);
+          float throttle = 1.5f + (val / 100.0f) * 98.5f;
+          xSemaphoreTake(hSensorMutex, portMAX_DELAY);
+          sensor_data.remote_throttle = throttle;
+          xSemaphoreGive(hSensorMutex);
+        } else if (strncmp(buf, "BR:", 3) == 0) {
+          float val = atof(buf + 3);
+          if (val > 0.0f)
+            xEventGroupSetBits(hEvents, EVT_REMOTE_BRAKE);
+          else
+            xEventGroupClearBits(hEvents, EVT_REMOTE_BRAKE);
+        }
+
+        idx = 0;
+      } else if (c != '\r') {
+        buf[idx++] = c;
+      }
+    }
+    vTaskDelay(5);
   }
 }
 
