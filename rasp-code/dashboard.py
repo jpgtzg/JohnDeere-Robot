@@ -1,4 +1,4 @@
-"""Streamlit telemetry dashboard for the tractor robot.
+"""Streamlit telemetry dashboard for the tractor robot (John Deere themed).
 
 Reads live metrics from InfluxDB (written by main.py / face.py), embeds the
 driver camera MJPEG stream (served by face.py), and lets the operator
@@ -8,6 +8,7 @@ Run on the Raspberry Pi with:
     uv run streamlit run dashboard.py --server.address 0.0.0.0
 """
 
+import warnings
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -16,8 +17,11 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 from influxdb_client.client.influxdb_client import InfluxDBClient
+from influxdb_client.client.warnings import MissingPivotFunction
 
 from influx import INFLUX_BUCKET, INFLUX_ORG, INFLUX_TOKEN, INFLUX_URL
+
+warnings.simplefilter("ignore", MissingPivotFunction)
 
 # ── config ────────────────────────────────────────────────────────────────────
 API_URL = "http://localhost:5000"
@@ -33,7 +37,14 @@ LATEST_WINDOW = "-5m"
 CAMERA_STREAM_PORT = 8080  # must match STREAM_PORT used by face.py
 CAMERA_HEIGHT = 360
 
-st.set_page_config(page_title="Tractor Telemetry", page_icon="🚜", layout="wide")
+# John Deere brand palette
+JD_GREEN = "#367C2B"
+JD_GREEN_DARK = "#2A5E22"
+JD_YELLOW = "#FFDE00"
+JD_RED = "#C0392B"
+JD_GREY = "#6B6B6B"
+
+st.set_page_config(page_title="John Deere — Tractor Telemetry", layout="wide")
 
 
 # ── influx access ─────────────────────────────────────────────────────────────
@@ -100,8 +111,17 @@ def set_control_mode(mode: str):
         return False, {"error": str(exc)}
 
 
-# ── plotly gauges ─────────────────────────────────────────────────────────────
-def gauge(value, title, max_value, suffix, bar_color="#2E86C1"):
+# ── ui helpers ────────────────────────────────────────────────────────────────
+def badge(text: str, color: str):
+    st.markdown(
+        f"<div style='background:{color};color:#fff;padding:16px;border-radius:8px;"
+        f"text-align:center;font-size:22px;font-weight:700;letter-spacing:1px'>"
+        f"{text}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def gauge(value, title, max_value, suffix, bar_color=JD_GREEN):
     val = value if value is not None else 0
     return go.Figure(
         go.Indicator(
@@ -113,9 +133,9 @@ def gauge(value, title, max_value, suffix, bar_color="#2E86C1"):
                 "axis": {"range": [0, max_value]},
                 "bar": {"color": bar_color},
                 "steps": [
-                    {"range": [0, max_value * 0.6], "color": "#EBF5FB"},
-                    {"range": [max_value * 0.6, max_value * 0.85], "color": "#FCF3CF"},
-                    {"range": [max_value * 0.85, max_value], "color": "#FADBD8"},
+                    {"range": [0, max_value * 0.6], "color": "#E8F0E5"},
+                    {"range": [max_value * 0.6, max_value * 0.85], "color": "#FBF6C8"},
+                    {"range": [max_value * 0.85, max_value], "color": "#F3D2CC"},
                 ],
             },
         )
@@ -137,7 +157,7 @@ def render_camera():
                style="width:100%;max-height:{CAMERA_HEIGHT}px;object-fit:contain;border-radius:6px"
                onerror="this.style.display='none';document.getElementById('camoff').style.display='block'"/>
           <div id="camoff" style="display:none;color:#aaa;padding:60px 10px">
-            📷 Cámara sin señal — corre <code>face.py</code> (stream en el puerto {CAMERA_STREAM_PORT})
+            Camara sin senal &mdash; corre <code>face.py</code> (stream en el puerto {CAMERA_STREAM_PORT})
           </div>
         </div>
         <script>
@@ -156,12 +176,13 @@ def render_camera():
 @st.fragment(run_every=REFRESH_SECONDS)
 def driver_status_panel():
     looking = latest_value("looking", DRIVER_MEASUREMENT)
+    st.markdown("**Estado del conductor**")
     if looking is None:
-        st.metric("Estado del conductor", "—")
+        badge("SIN DATOS", JD_GREY)
     elif int(looking) == 1:
-        st.metric("Estado del conductor", "👁️ Atento")
+        badge("ATENTO", JD_GREEN)
     else:
-        st.metric("Estado del conductor", "⚠️ Distraído")
+        badge("DISTRAIDO", JD_RED)
     st.caption(f"Actualizado: {datetime.now(timezone.utc).astimezone():%H:%M:%S}")
 
 
@@ -177,22 +198,22 @@ def live_metrics():
     with c1:
         st.plotly_chart(
             gauge(engine_rpm, "Engine RPM", ENGINE_RPM_MAX, "rpm"),
-            use_container_width=True,
+            width="stretch",
         )
     with c2:
-        st.metric("Gear", f"{int(gear)}" if gear is not None else "—")
+        st.metric("Gear", f"{int(gear)}" if gear is not None else "-")
     with c3:
-        st.metric("Control Mode", (mode or "—").upper())
+        st.metric("Control Mode", (mode or "-").upper())
 
     # vehicle speed gauge + time series
     g1, g2 = st.columns([1, 3])
     with g1:
         st.plotly_chart(
-            gauge(vehicle_speed, "Vehicle Speed", VEHICLE_SPEED_MAX, "km/h", "#28B463"),
-            use_container_width=True,
+            gauge(vehicle_speed, "Vehicle Speed", VEHICLE_SPEED_MAX, "km/h", JD_GREEN_DARK),
+            width="stretch",
         )
     with g2:
-        st.subheader("Vehicle Speed — last 10 min")
+        st.subheader("Vehicle Speed - last 10 min")
         speed_df = time_series("vehicle_speed")
         if speed_df.empty:
             st.info("No vehicle speed data in the selected window.")
@@ -202,9 +223,9 @@ def live_metrics():
                     x=speed_df["time"],
                     y=speed_df["vehicle_speed"],
                     mode="lines",
-                    line=dict(color="#28B463", width=2),
+                    line=dict(color=JD_GREEN, width=2),
                     fill="tozeroy",
-                    fillcolor="rgba(40,180,99,0.15)",
+                    fillcolor="rgba(54,124,43,0.15)",
                 )
             )
             fig.update_layout(
@@ -213,10 +234,10 @@ def live_metrics():
                 xaxis_title="Time",
                 yaxis_title="km/h",
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # engine rpm trend
-    st.subheader("Engine RPM — last 10 min")
+    st.subheader("Engine RPM - last 10 min")
     rpm_df = time_series("engine_speed")
     if rpm_df.empty:
         st.info("No engine RPM data in the selected window.")
@@ -226,7 +247,7 @@ def live_metrics():
                 x=rpm_df["time"],
                 y=rpm_df["engine_speed"],
                 mode="lines",
-                line=dict(color="#2E86C1", width=2),
+                line=dict(color=JD_GREEN, width=2),
             )
         )
         fig.update_layout(
@@ -235,15 +256,15 @@ def live_metrics():
             xaxis_title="Time",
             yaxis_title="rpm",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if err := st.session_state.get("influx_error"):
-        st.caption(f"⚠️ InfluxDB: {err}")
+        st.caption(f"InfluxDB: {err}")
 
 
 # ── sidebar: control mode (full rerun on interaction) ─────────────────────────
 with st.sidebar:
-    st.header("⚙️ Control")
+    st.header("Control")
     current_mode = get_control_mode()
     if current_mode is None:
         st.error("API not reachable (port 5000)")
@@ -255,7 +276,7 @@ with st.sidebar:
         options=["local", "remote"],
         index=0 if (current_mode or "local") == "local" else 1,
     )
-    if st.button("Change mode", use_container_width=True):
+    if st.button("Change mode", width="stretch"):
         ok, payload = set_control_mode(new_mode)
         if ok:
             st.success(f"Mode set to {payload.get('mode', new_mode).upper()}")
@@ -266,11 +287,22 @@ with st.sidebar:
     st.caption(f"Auto-refresh cada {REFRESH_SECONDS}s")
 
 
-# ── main layout ───────────────────────────────────────────────────────────────
-st.title("🚜 Tractor Telemetry Dashboard")
+# ── branded header ────────────────────────────────────────────────────────────
+st.markdown(
+    f"""
+    <div style="background:{JD_GREEN};padding:16px 24px;border-radius:10px;
+                display:flex;align-items:center;gap:18px;margin-bottom:14px">
+      <span style="font-family:'Arial Black',Arial,sans-serif;font-weight:900;
+                   font-size:32px;color:{JD_YELLOW};letter-spacing:1px">JOHN DEERE</span>
+      <span style="color:#ffffff;font-size:20px;font-weight:600">
+        Tractor Telemetry Dashboard</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Driver monitoring: live camera (persistent) + live attention status
-st.subheader("👁️ Monitoreo del conductor")
+st.subheader("Monitoreo del conductor")
 cam_col, status_col = st.columns([3, 1])
 with cam_col:
     render_camera()  # rendered once — keeps the MJPEG connection alive
