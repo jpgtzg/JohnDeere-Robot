@@ -50,7 +50,8 @@ st.markdown(
     """
     <style>
       #MainMenu, footer {visibility: hidden;}
-      .block-container {padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1500px;}
+      [data-testid="stHeader"] {display: none;}
+      .block-container {padding-top: 2.2rem; padding-bottom: 2rem; max-width: 1500px;}
       div[data-testid="stMetric"] {
         background: #FFFFFF; border: 1px solid #E3E8E3; border-radius: 12px;
         padding: 12px 16px;
@@ -328,74 +329,85 @@ def detail_panels():
         st.caption(f"InfluxDB: {err}")
 
 
-# ── sidebar: control mode (immediate-apply, no stale button) ──────────────────
+# ── control panel (mode + remote driving) ────────────────────────────────────
 def _apply_mode():
     ok, payload = set_control_mode(st.session_state.mode_select)
     st.session_state["mode_result"] = (ok, payload)
 
 
-with st.sidebar:
-    st.header("Control")
+def _remote_feedback(ok, payload):
+    msg = payload.get("command", payload.get("error", "")) if isinstance(payload, dict) else ""
+    (st.success if ok else st.error)(msg)
 
-    live_mode = get_control_mode()
-    if live_mode is None:
-        st.error("API no disponible (puerto 5000)")
-    else:
-        st.markdown(
-            f"<div style='background:{JD_GREEN};color:#fff;padding:10px 14px;"
-            f"border-radius:8px;font-weight:700;text-align:center'>"
-            f"MODO ACTUAL: {live_mode.upper()}</div>",
-            unsafe_allow_html=True,
-        )
 
-    if "mode_select" not in st.session_state:
-        st.session_state.mode_select = live_mode or "local"
+def control_panel():
+    with st.container(border=True):
+        card_title("Panel de control")
+        mode_col, remote_col = st.columns([1, 2])
 
-    st.radio(
-        "Cambiar modo de control",
-        options=["local", "remote"],
-        key="mode_select",
-        on_change=_apply_mode,
-    )
+        # — control mode —
+        with mode_col:
+            live_mode = get_control_mode()
+            if live_mode is None:
+                st.error("API no disponible (puerto 5000)")
+            else:
+                st.markdown(
+                    f"<div style='background:{JD_GREEN};color:#fff;padding:10px 14px;"
+                    f"border-radius:8px;font-weight:700;text-align:center'>"
+                    f"MODO ACTUAL: {live_mode.upper()}</div>",
+                    unsafe_allow_html=True,
+                )
+            if "mode_select" not in st.session_state:
+                st.session_state.mode_select = live_mode or "local"
+            st.radio(
+                "Cambiar modo de control",
+                options=["local", "remote"],
+                key="mode_select",
+                on_change=_apply_mode,
+                horizontal=True,
+            )
+            res = st.session_state.get("mode_result")
+            if res is not None:
+                ok, payload = res
+                if ok:
+                    st.success(f"Modo aplicado: {payload.get('mode', '').upper()}")
+                else:
+                    st.error(payload.get("error", "No se pudo cambiar el modo"))
 
-    res = st.session_state.get("mode_result")
-    if res is not None:
-        ok, payload = res
-        if ok:
-            st.success(f"Modo aplicado: {payload.get('mode', '').upper()}")
-        else:
-            st.error(payload.get("error", "No se pudo cambiar el modo"))
+        # — remote driving (only active in REMOTE mode) —
+        with remote_col:
+            remote_on = live_mode == "remote"
+            st.markdown("**Control remoto**")
+            if not remote_on:
+                st.info("Disponible solo en modo REMOTE")
 
-    # ── remote driving controls (only active in REMOTE mode) ──────────────────
-    st.divider()
-    st.subheader("Control remoto")
-    remote_on = live_mode == "remote"
-    if not remote_on:
-        st.info("Disponible solo en modo REMOTE")
+            a_col, b_col = st.columns(2)
+            with a_col:
+                accel = st.slider(
+                    "Aceleración (%)", 0, 100, 0, disabled=not remote_on, key="accel_val"
+                )
+                if st.button(
+                    "Enviar aceleración", disabled=not remote_on, width="stretch"
+                ):
+                    _remote_feedback(*send_remote("acceleration", accel))
+            with b_col:
+                brake = st.slider(
+                    "Freno (%)", 0, 100, 0, disabled=not remote_on, key="brake_val"
+                )
+                if st.button("Enviar freno", disabled=not remote_on, width="stretch"):
+                    _remote_feedback(*send_remote("brake", brake))
 
-    accel = st.slider(
-        "Aceleración (%)", 0, 100, 0, disabled=not remote_on, key="accel_val"
-    )
-    if st.button("Enviar aceleración", disabled=not remote_on, width="stretch"):
-        ok, payload = send_remote("acceleration", accel)
-        (st.success if ok else st.error)(
-            payload.get("command", payload.get("error", "")) if isinstance(payload, dict) else ""
-        )
-
-    brake = st.slider("Freno (%)", 0, 100, 0, disabled=not remote_on, key="brake_val")
-    if st.button("Enviar freno", disabled=not remote_on, width="stretch"):
-        ok, payload = send_remote("brake", brake)
-        (st.success if ok else st.error)(
-            payload.get("command", payload.get("error", "")) if isinstance(payload, dict) else ""
-        )
-
-    if st.button("PARO — freno máx.", type="primary", disabled=not remote_on, width="stretch"):
-        send_remote("acceleration", 0)
-        ok, payload = send_remote("brake", 100)
-        (st.success if ok else st.error)("Freno de emergencia enviado" if ok else "Error")
-
-    st.divider()
-    st.caption(f"Auto-refresh cada {REFRESH_SECONDS}s")
+            if st.button(
+                "PARO — freno máx.",
+                type="primary",
+                disabled=not remote_on,
+                width="stretch",
+            ):
+                send_remote("acceleration", 0)
+                ok, _ = send_remote("brake", 100)
+                (st.success if ok else st.error)(
+                    "Freno de emergencia enviado" if ok else "Error"
+                )
 
 
 # ── branded header ────────────────────────────────────────────────────────────
@@ -415,6 +427,10 @@ st.markdown(
 
 # KPI strip
 kpi_strip()
+st.write("")
+
+# Control panel (mode + remote driving) — before the camera
+control_panel()
 st.write("")
 
 # Driver monitoring: live camera (persistent) + live attention status
