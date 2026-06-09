@@ -110,7 +110,9 @@ def time_series(field: str, measurement: str = MEASUREMENT) -> pd.DataFrame:
         df = pd.concat(df) if df else pd.DataFrame()
     if df.empty or "_value" not in df:
         return pd.DataFrame(columns=["time", field])
-    return df.rename(columns={"_time": "time", "_value": field})[["time", field]]
+    out = df.rename(columns={"_time": "time", "_value": field})[["time", field]].copy()
+    out["time"] = pd.to_datetime(out["time"])  # real datetime axis, not categorical
+    return out.sort_values("time")
 
 
 # ── control mode API ──────────────────────────────────────────────────────────
@@ -206,7 +208,7 @@ def line_fig(df, field, color, area=False, y_title=None):
         yaxis_title=y_title,
         plot_bgcolor="#FFFFFF",
         paper_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(showgrid=False),
+        xaxis=dict(type="date", showgrid=False, tickformat="%H:%M:%S"),
         yaxis=dict(gridcolor="#EEF2EE"),
     )
     return fig
