@@ -264,6 +264,8 @@ def main():
     detector = _FaceDetector()
     landmarker = _FaceLandmarker()
 
+    headless = not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY")
+
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Cannot open webcam")
@@ -290,43 +292,46 @@ def main():
                     "driver_metrics", "looking", int(looking), "Raspberry_Pi"
                 )
 
-            eye_color = (0, 255, 0) if looking else (0, 0, 255)
-            draw_eye(frame, lm, LEFT_EYE, eye_color)
-            draw_eye(frame, lm, RIGHT_EYE, eye_color)
-            draw_iris(frame, lm, LEFT_IRIS, (255, 255, 0))
-            draw_iris(frame, lm, RIGHT_IRIS, (255, 255, 0))
+            if not headless:
+                eye_color = (0, 255, 0) if looking else (0, 0, 255)
+                draw_eye(frame, lm, LEFT_EYE, eye_color)
+                draw_eye(frame, lm, RIGHT_EYE, eye_color)
+                draw_iris(frame, lm, LEFT_IRIS, (255, 255, 0))
+                draw_iris(frame, lm, RIGHT_IRIS, (255, 255, 0))
 
-            label = "Looking at camera" if looking else "Not looking"
-            gaze_dbg = f"iris  L h:{lh:.2f} v:{lv:.2f}  R h:{rh:.2f} v:{rv:.2f}"
-            pose_dbg = f"head  yaw:{yaw:+.1f}  pitch:{pitch:+.1f}"
-            cv2.putText(
-                frame, label, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, eye_color, 2
-            )
-            cv2.putText(
-                frame,
-                gaze_dbg,
-                (20, 75),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (200, 200, 200),
-                1,
-            )
-            cv2.putText(
-                frame,
-                pose_dbg,
-                (20, 95),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (200, 200, 200),
-                1,
-            )
+                label = "Looking at camera" if looking else "Not looking"
+                gaze_dbg = f"iris  L h:{lh:.2f} v:{lv:.2f}  R h:{rh:.2f} v:{rv:.2f}"
+                pose_dbg = f"head  yaw:{yaw:+.1f}  pitch:{pitch:+.1f}"
+                cv2.putText(
+                    frame, label, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, eye_color, 2
+                )
+                cv2.putText(
+                    frame,
+                    gaze_dbg,
+                    (20, 75),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (200, 200, 200),
+                    1,
+                )
+                cv2.putText(
+                    frame,
+                    pose_dbg,
+                    (20, 95),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (200, 200, 200),
+                    1,
+                )
 
-        cv2.imshow("Gaze Detection", frame)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
+        if not headless:
+            cv2.imshow("Gaze Detection", frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
     cap.release()
-    cv2.destroyAllWindows()
+    if not headless:
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
