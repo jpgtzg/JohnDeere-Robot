@@ -201,7 +201,7 @@ def gauge(value, max_value, suffix, bar_color=JD_GREEN, steps=None):
     )
 
 
-def line_fig(df, field, color, area=False, y_title=None, markers=False):
+def line_fig(df, field, color, area=False, y_title=None, markers=False, height=240):
     fig = go.Figure(
         go.Scatter(
             x=df["time"],
@@ -214,7 +214,7 @@ def line_fig(df, field, color, area=False, y_title=None, markers=False):
         )
     )
     fig.update_layout(
-        height=240,
+        height=height,
         margin=dict(l=8, r=8, t=8, b=8),
         xaxis_title="Tiempo",
         yaxis_title=y_title,
@@ -327,17 +327,20 @@ def detail_panels():
 
     with right:
         with st.container(border=True):
-            card_title("Velocidad del vehículo")
-            st.plotly_chart(
-                gauge(spd, VEHICLE_SPEED_MAX, "km/h", JD_GREEN_DARK), width="stretch"
+            card_title("Histórico de Velocidad")
+            st.metric(
+                "Velocidad actual", f"{spd:.0f} km/h" if spd is not None else "—"
             )
-            st.caption("Velocidad vs Tiempo (últimos 10 min)")
+            st.caption("Velocidad vs Tiempo (últimos 5 min)")
             spd_df = time_series("vehicle_speed")
             if spd_df.empty:
                 st.info("Sin datos de velocidad en la ventana.")
             else:
                 st.plotly_chart(
-                    line_fig(spd_df, "vehicle_speed", JD_GREEN, y_title="km/h", markers=True),
+                    line_fig(
+                        spd_df, "vehicle_speed", JD_GREEN, y_title="km/h",
+                        markers=True, height=320,
+                    ),
                     width="stretch",
                 )
 
