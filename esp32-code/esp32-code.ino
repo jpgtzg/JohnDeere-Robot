@@ -104,7 +104,6 @@ void loop() {
   if (!mqttClient.connected()) connectMQTT();
   mqttClient.loop();
 
-  // Non-blocking: read one character at a time so mqtt.loop() runs every iteration
   while (STM32_SERIAL.available()) {
     char c = STM32_SERIAL.read();
     if (c == '\n') {

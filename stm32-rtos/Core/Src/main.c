@@ -5,7 +5,7 @@
 #include "FreeRTOSConfig.h"
 #include "portmacro.h"
 #include "task.h"
-#include "semphr.h"
+#include "queue.h"
 #include "event_groups.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -34,10 +34,9 @@ typedef struct {
 #define EVT_REMOTE_MODE   (1 << 1)
 #define EVT_REMOTE_BRAKE  (1 << 2)
 
-static SensorData_t sensor_data = {0};
-static ModelOutput_t model_output = {0};
-static SemaphoreHandle_t hSensorMutex;
-static SemaphoreHandle_t hModelMutex;
+static QueueHandle_t hSensorQueue;
+static QueueHandle_t hModelQueue;
+static QueueHandle_t hUartRxQueue;
 static EventGroupHandle_t hEvents;
 
 void TASK_Sensor(void *pvParameters);
@@ -66,19 +65,40 @@ int main(void) {
   LCD_Init();
   LCD_Clear();
 
-  hSensorMutex = xSemaphoreCreateMutex();
-  hModelMutex  = xSemaphoreCreateMutex();
-  hEvents      = xEventGroupCreate();
+  hSensorQueue  = xQueueCreate(1,  sizeof(SensorData_t));
+  hModelQueue   = xQueueCreate(1,  sizeof(ModelOutput_t));
+  hUartRxQueue  = xQueueCreate(64, sizeof(uint8_t));
+  hEvents       = xEventGroupCreate();
 
   xTaskCreate(TASK_Sensor,       "Sensor",       256, NULL, 4, &hSensor);
   xTaskCreate(TASK_ControlMotor, "ControlMotor", 256, NULL, 3, &hControlMotor);
   xTaskCreate(TASK_Comm,         "Comm",         256, NULL, 2, &hComm);
   xTaskCreate(TASK_Display,      "Display",      512, NULL, 1, &hDisplay);
 
+  /* Enable USART1 RX interrupt — priority must be >= configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY */
+  NVIC_SetPriority(USART1_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
+  NVIC_EnableIRQ(USART1_IRQn);
+  USART1->CR1 |= (0x1UL << 5U); // RXNEIE: interrupt on RXNE and ORE
+
   vTaskStartScheduler();
 
   for (;;)
     ;
+}
+
+void USART1_IRQHandler(void) {
+  BaseType_t woken = pdFALSE;
+  uint32_t sr = USART1->SR;
+
+  if (sr & (0x1UL << 3U)) {  // ORE: read DR to clear, discard the byte
+    (void)USART1->DR;
+    return;
+  }
+  if (sr & (0x1UL << 5U)) {  // RXNE: a byte is ready
+    uint8_t byte = (uint8_t)USART1->DR;
+    xQueueSendFromISR(hUartRxQueue, &byte, &woken);
+    portYIELD_FROM_ISR(woken);
+  }
 }
 
 void USER_SystemClock_Config(void) {
@@ -101,19 +121,13 @@ void TASK_Sensor(void *pvParameters) {
   static char    cmd_buf[32];
   static uint8_t cmd_idx = 0;
   uint8_t        rx_char;
-  volatile uint32_t dummy;
+  SensorData_t   sens = {.adc_value = 0, .remote_throttle = 1.5f};
 
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
 
-    /* ---- UART RX: clear overrun, then drain all available bytes ---- */
-    if (USART1->SR & (0x1UL << 3U)) {
-      dummy = USART1->SR;
-      dummy = USART1->DR;
-      (void)dummy;
-    }
-    while (USART1_Available()) {
-      rx_char = USART1_Receive_8bit();
+    /* ---- UART RX: drain the interrupt-fed byte queue ---- */
+    while (xQueueReceive(hUartRxQueue, &rx_char, 0) == pdTRUE) {
       if (rx_char == '\r' || rx_char == '\n') {
         if (cmd_idx > 0) {
           cmd_buf[cmd_idx] = '\0';
@@ -127,10 +141,8 @@ void TASK_Sensor(void *pvParameters) {
               xEventGroupClearBits(hEvents, EVT_REMOTE_MODE | EVT_REMOTE_BRAKE);
             }
           } else if (strncmp(cmd_buf, "AC:", 3) == 0) {
-            float throttle = 1.5f + (atof(cmd_buf + 3) / 100.0f) * 98.5f;
-            xSemaphoreTake(hSensorMutex, portMAX_DELAY);
-            sensor_data.remote_throttle = throttle;
-            xSemaphoreGive(hSensorMutex);
+            sens.remote_throttle = 1.5f + (atof(cmd_buf + 3) / 100.0f) * 98.5f;
+            xQueueOverwrite(hSensorQueue, &sens);
           } else if (strncmp(cmd_buf, "BR:", 3) == 0) {
             if (atof(cmd_buf + 3) > 0.0f)
               xEventGroupSetBits(hEvents, EVT_REMOTE_BRAKE);
@@ -155,11 +167,10 @@ void TASK_Sensor(void *pvParameters) {
     ADC1->CR2 |= (0x1UL << 22U);
     while (!(ADC1->SR & (0x1UL << 1U)));
 
-    xSemaphoreTake(hSensorMutex, portMAX_DELAY);
-    sensor_data.adc_value = ADC1->DR & 0xFFFF;
-    xSemaphoreGive(hSensorMutex);
+    sens.adc_value = ADC1->DR & 0xFFFF;
+    xQueueOverwrite(hSensorQueue, &sens);
 
-    vTaskDelayUntil(&xLastWakeTime, 1);
+    vTaskDelayUntil(&xLastWakeTime, 5);
   }
 }
 
@@ -167,27 +178,38 @@ void TASK_ControlMotor(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
     SensorData_t sens;
-    xSemaphoreTake(hSensorMutex, portMAX_DELAY);
-    sens = sensor_data;
-    xSemaphoreGive(hSensorMutex);
+    xQueuePeek(hSensorQueue, &sens, portMAX_DELAY);
 
     EventBits_t bits = xEventGroupGetBits(hEvents);
     if (bits & EVT_REMOTE_MODE) {
-      EngTrModel_U.Throttle    = sens.remote_throttle;
-      EngTrModel_U.BrakeTorque = (bits & EVT_REMOTE_BRAKE) ? 200.0 : 0.0;
+      float throttle = sens.remote_throttle < 1.5f ? 1.5f : sens.remote_throttle;
+      EngTrModel_U.Throttle    = throttle;
+      EngTrModel_U.BrakeTorque = (bits & EVT_REMOTE_BRAKE) ? 350.0 : 0.0;
     } else {
       EngTrModel_U.Throttle    = 1.5f + ((float)sens.adc_value / 4095.0f) * 98.5f;
-      EngTrModel_U.BrakeTorque = (bits & EVT_BRAKE) ? 200.0 : 0.0;
+      EngTrModel_U.BrakeTorque = (bits & EVT_BRAKE) ? 350.0 : 0.0;
     }
+
+    /* Reinitialize the model if its state has diverged */
+    double spd = EngTrModel_Y.VehicleSpeed;
+    if (spd != spd || spd > 1e6 || spd < -1e3) {
+      EngTrModel_initialize();
+    }
+
     EngTrModel_step();
 
-    xSemaphoreTake(hModelMutex, portMAX_DELAY);
-    model_output.vehicle_speed = EngTrModel_Y.VehicleSpeed;
-    model_output.engine_speed  = EngTrModel_Y.EngineSpeed;
-    model_output.gear          = EngTrModel_Y.Gear;
-    xSemaphoreGive(hModelMutex);
+    double vehicle_speed = EngTrModel_Y.VehicleSpeed;
+    if (vehicle_speed < 0.0)   vehicle_speed = 0.0;
+    if (vehicle_speed > 140.0) vehicle_speed = 140.0;
 
-    uint8_t duty = (uint8_t)((EngTrModel_Y.VehicleSpeed / 140.0) * 100.0);
+    ModelOutput_t out = {
+      .vehicle_speed = vehicle_speed,
+      .engine_speed  = EngTrModel_Y.EngineSpeed,
+      .gear          = EngTrModel_Y.Gear,
+    };
+    xQueueOverwrite(hModelQueue, &out);
+
+    uint8_t duty = (uint8_t)((vehicle_speed / 140.0) * 100.0);
     Change_Duty_Cycle_M1(duty);
     Change_Duty_Cycle_M2(duty);
     Change_Duty_Cycle_M3(duty);
@@ -201,9 +223,7 @@ void TASK_Comm(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
     ModelOutput_t out;
-    xSemaphoreTake(hModelMutex, portMAX_DELAY);
-    out = model_output;
-    xSemaphoreGive(hModelMutex);
+    xQueuePeek(hModelQueue, &out, portMAX_DELAY);
 
     char buffer[32];
     uint16_t len;
@@ -229,10 +249,7 @@ void TASK_Display(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   for (;;) {
     ModelOutput_t out;
-
-    xSemaphoreTake(hModelMutex, portMAX_DELAY);
-    out = model_output;
-    xSemaphoreGive(hModelMutex);
+    xQueuePeek(hModelQueue, &out, portMAX_DELAY);
 
     duty_pct = (uint8_t)(out.vehicle_speed / 140.0 * 100.0);
     rpm_val  = (uint16_t)out.engine_speed;
