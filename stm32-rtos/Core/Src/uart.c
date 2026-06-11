@@ -22,6 +22,10 @@ void USART1_Init(void) {
   GPIOA->CRH |=  (0x2UL << 6U) |  (0x1UL << 4U);
 }
 
+int USART1_Available(void) {
+  return !!(USART1->SR & (0x1UL << 5U));
+}
+
 void USART1_Transmit(uint8_t *pData, uint16_t size) {
   for (int i = 0; i < size; i++) {
     USART1_Send_8bit(*pData++);
