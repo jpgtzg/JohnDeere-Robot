@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "functions.h"
 #include "lcd.h"
 #include "motor.h"
 #include "pwm.h"
@@ -44,7 +43,6 @@ int main(void) {
   TIM2_PWM_Init();
   TIM4_PWM_Init();
   Motor_GPIO_Init();
-  Motor_All_Forward();
   LCD_Init();
   LCD_Clear();
 
@@ -146,6 +144,9 @@ void TASK_ControlMotor(void *pvParameters) {
 void DifferentialDrive(ControlData_t *control) {
   float left_speed  = control->xspeed - control->yspeed;
   float right_speed = control->xspeed + control->yspeed;
+
+
+  // TODO: I'm just limiting to 100, but the Duty cycle can be from o to 255
 
   if (left_speed > 100.0f) left_speed = 100.0f;
   if (left_speed < -100.0f) left_speed = -100.0f;

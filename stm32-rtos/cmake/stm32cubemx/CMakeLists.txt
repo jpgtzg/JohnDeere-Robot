@@ -23,19 +23,11 @@ set(MX_Include_Dirs
 # STM32CubeMX generated application sources
 set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/user_uart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/uart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/pwm.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/motor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/lcd.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/i2c.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/keypad.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/functions.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/EngTrModel.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/EngTrModel_data.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/rt_nonfinite.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/rtGetNaN.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/rtGetInf.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/freertos.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_it.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_hal_msp.c
